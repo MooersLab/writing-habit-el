@@ -105,8 +105,8 @@ writing-habit
     d  Create a database
   Plan and track
     p  Import a weekly plan
-    c  Import actuals CSV
-    i  Import actuals ICS
+    c  Import actual CSV
+    i  Import actual ICS
     k  Harvest org clocks
     a  Add a session by hand
   Review
