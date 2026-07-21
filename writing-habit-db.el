@@ -53,8 +53,12 @@
   "Directory this file was loaded from, used to locate the shared schema.")
 
 (defcustom writing-habit-db-schema-file
-  (expand-file-name "../schema.sql" writing-habit-db--load-dir)
-  "Path to the shared schema.sql, the single contract between the modules."
+  (let ((root (locate-dominating-file writing-habit-db--load-dir "schema.sql")))
+    (expand-file-name "schema.sql" (or root writing-habit-db--load-dir)))
+  "Path to the shared schema.sql, the single contract between the modules.
+Located by walking up from this file's directory, so it works whether
+schema.sql sits beside the modules, as in the installed package, or one
+level up, as in the development layout."
   :type 'file
   :group 'writing-habit)
 
