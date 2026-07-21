@@ -1,9 +1,9 @@
 # writing-habit
 
 [![CI](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml/badge.svg)](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml)
-<!-- [![MELPA](https://melpa.org/packages/writing-habit-badge.svg)](https://melpa.org/#/writing-habit) -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Emacs](https://img.shields.io/badge/Emacs-29.1%2B-7F5AB6.svg?logo=gnuemacs&logoColor=white)](https://www.gnu.org/software/emacs/)
+<!-- [![MELPA](https://melpa.org/packages/writing-habit-badge.svg)](https://melpa.org/#/writing-habit) -->
 
 Track and compare planned versus actual academic writing effort, without leaving Emacs.
 
