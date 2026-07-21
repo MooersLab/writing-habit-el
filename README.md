@@ -7,7 +7,7 @@
 
 Track and compare planned versus actual academic writing effort, without leaving Emacs.
 
-`writing-habit` is the Emacs Lisp companion to [writing-schedule.el](https://github.com/MooersLab/writing-schedule) and to the Python [writing-habit](https://github.com/MooersLab/writing-habit) package. `writing-schedule` builds a weekly plan; `writing-habit` records what you actually did and shows you the gap. It records self-reported effort, not verified focus, and it is a tool for one person studying and improving their own writing habit, an N-of-1 instrument.
+`writing-habit` is the Emacs Lisp companion to [writing-schedule.el](https://github.com/MooersLab/writing-schedule) and a port of the Python [writing-habit](https://github.com/MooersLab/writing-habit) package. `writing-schedule` builds a weekly plan; `writing-habit` records what you actually did and shows you the gaps. It records self-reported effort, not verified focus. The accuracy of the data is left to the user.
 
 The three stages share one SQLite database defined in `schema.sql`, the single contract between them:
 
