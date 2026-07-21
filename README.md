@@ -1,5 +1,6 @@
 # writing-habit
 
+![Version](https://img.shields.io/static/v1?label=writing-habit-el&message=0.1.0&color=brightcolor)
 [![CI](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml/badge.svg)](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Emacs](https://img.shields.io/badge/Emacs-29.1%2B-7F5AB6.svg?logo=gnuemacs&logoColor=white)](https://www.gnu.org/software/emacs/)
