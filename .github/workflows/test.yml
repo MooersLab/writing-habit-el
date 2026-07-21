@@ -1,0 +1,47 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        emacs_version: ['29.1', '29.4']
+        include:
+          - emacs_version: snapshot
+            experimental: true
+    continue-on-error: ${{ matrix.experimental || false }}
+    name: Emacs ${{ matrix.emacs_version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Emacs ${{ matrix.emacs_version }}
+        uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs_version }}
+
+      - name: Report SQLite support
+        run: |
+          emacs -Q --batch --eval "(princ (format \"sqlite-available-p: %s\n\" (and (fboundp 'sqlite-available-p) (sqlite-available-p))))"
+
+      - name: Fetch writing-schedule (optional, enables the plan-import tests)
+        continue-on-error: true
+        run: git clone --depth 1 https://github.com/MooersLab/writing-schedule.git ../writing-schedule
+
+      - name: Byte-compile, treating warnings as errors
+        run: make compile
+
+      - name: Run the test suite
+        run: |
+          WS=""
+          if [ -f ../writing-schedule/writing-schedule.el ]; then
+            WS="$(cd ../writing-schedule && pwd)"
+          fi
+          make test WRITING_SCHEDULE_DIR="$WS"

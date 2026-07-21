@@ -1,0 +1,21 @@
+# Byte-compiled Emacs Lisp
+*.elc
+
+# Emacs backups and autosaves
+*~
+\#*\#
+.\#*
+
+# Test and scratch databases
+*.db-journal
+*.db-wal
+/habit.db
+/tmp/
+
+# Generated output
+/writing-dashboard.html
+/*.png
+!imgs/*.png
+
+# macOS
+.DS_Store
