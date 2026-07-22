@@ -37,7 +37,7 @@ make test WRITING_SCHEDULE_DIR=/path/to/writing-schedule
 
 ## The interoperability contract
 
-This package shares one SQLite schema, `schema.sql`, and one output format with the Python [writing-habit](https://github.com/MooersLab/writing-habit) package, so a database written by one reads in the other and the two produce byte-identical dashboards. That contract is load-bearing, so please protect it.
+This package shares one SQLite schema, `schema.sql`, and one output format with the Python [writing-habit](https://github.com/MooersLab/writing-habit-py) package, so a database written by one reads in the other and the two produce byte-identical dashboards. That contract is load-bearing, so please protect it.
 
 - When you change `schema.sql`, change it in both ports, because both read the same file.
 - When you change a serialized output, the report text, the dashboard HTML, or the plot, regenerate the committed fixture under `test/fixtures/` from the Python side and update the guard test on this side, so the two ports stay pinned to the same bytes.
@@ -54,4 +54,6 @@ Continuous integration runs the same `make compile` and `make test` across sever
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the MIT License, the same license that covers the project. See [LICENSE](LICENSE).
+This project uses split licensing: the source code is under the MIT License, and the images in `assets/images/` are under CC BY 4.0.
+
+By contributing code, you agree that your contributions are licensed under the MIT License; see [LICENSE](LICENSE). By contributing an image or figure, you agree that it is licensed under the Creative Commons Attribution 4.0 International License; see [assets/images/LICENSE](assets/images/LICENSE).
