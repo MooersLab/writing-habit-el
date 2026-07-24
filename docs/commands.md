@@ -21,6 +21,8 @@ writing-habit
   Review
     r  Weekly report
     D  HTML dashboard
+    S  Seasons dashboard
+    t  Tag a week's context
     n  Decode a schedule code
 ```
 
@@ -41,6 +43,8 @@ so you can keep more than one.
 | `writing-habit-track-harvest-clock-file` | Harvest completed org-clock entries. |
 | `writing-habit-report-week` | Show the weekly comparison as an org buffer. |
 | `writing-habit-dashboard` | Write and open the HTML dashboard. |
+| `writing-habit-seasons` | Write and open the seasons dashboard, grouped by month, context, and schedule. |
+| `writing-habit-context-set-interactive` | Tag a week with an event context. |
 | `writing-habit-name` | Decode a schedule code and check it against a legend. |
 
 Every date prompt accepts any day inside the target week, because the week snaps
@@ -62,6 +66,8 @@ emacs --batch -l writing-habit -f writing-habit-batch \
       track add --day DATE --project CODE [--minutes N] [--category C] [--start HH:MM] [--end HH:MM] [--note TEXT] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch compare --week DATE [--plot FILE] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch dashboard --week DATE --out FILE --db DB
+emacs --batch -l writing-habit -f writing-habit-batch seasons --out FILE --db DB
+emacs --batch -l writing-habit -f writing-habit-batch context set|clear|list [--week DATE] [--tag TAG] [--note TEXT] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch name CODE [--table TABLE]
 ```
 
@@ -90,6 +96,13 @@ also writes a bar chart, which needs `python3` with `matplotlib`.
 
 `dashboard` renders the self-contained HTML dashboard for the week and writes it
 to `--out`.
+
+`seasons` writes the second HTML dashboard, which groups adherence by calendar
+month, by event-context tag, and by the schedule file-name code. The schedule
+code is captured at plan import from the table file name.
+
+`context` tags a week with an event, with `set`, `clear`, and `list`
+subcommands, so `seasons` can group weeks by kind. A week may carry several tags.
 
 `name` decodes a schedule code and, with `--table`, checks its project letters
 against that table's legend.

@@ -150,7 +150,8 @@ an activity name or a project letter to its block count."
 (defun writing-habit-name-read-legend (table-path)
   "Return the legend of the weekly org table at TABLE-PATH.
 The result is an alist of (CODE . (DESCRIPTION RISK)).  RISK is a
-lowercase string, one of \"safe\", \"speculative\", or \"support\", or nil.
+lowercase string, one of \"safe\" or \"speculative\", or nil.  Support is an
+activity category, not a risk class, so a legacy support tag records no risk.
 A legend row carries the code and description in its first cell, for
 example |A: DNPH1 docking :safe:|.  A trailing risk tag is stripped."
   (let ((legend '()))
@@ -172,8 +173,11 @@ example |A: DNPH1 docking :safe:|.  A trailing risk tag is stripped."
                       (risk nil))
                   (let ((case-fold-search t))
                     (when (string-match writing-habit-name--risk-re desc)
-                      (setq risk (downcase (or (match-string 1 desc)
-                                               (match-string 2 desc))))
+                      (let ((tag (downcase (or (match-string 1 desc)
+                                               (match-string 2 desc)))))
+                        ;; Only safe and speculative are risk classes; a legacy
+                        ;; support tag is stripped but records no risk.
+                        (setq risk (and (member tag '("safe" "speculative")) tag)))
                       (setq desc (string-trim
                                   (replace-regexp-in-string
                                    writing-habit-name--risk-re "" desc)))))

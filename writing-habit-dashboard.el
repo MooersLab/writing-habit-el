@@ -173,6 +173,103 @@
    (list week-start)))
 
 
+;;;; Weekly adherence trend (build step 2)
+;; An inline SVG of overall adherence over recent weeks, drawn with integer
+;; coordinates so this stays byte-identical to the Python twin.  The geometry
+;; constants are shared verbatim with dashboard.py.
+
+(defconst writing-habit-dashboard--trend-w 680)
+(defconst writing-habit-dashboard--trend-h 170)
+(defconst writing-habit-dashboard--trend-ml 42)
+(defconst writing-habit-dashboard--trend-mr 12)
+(defconst writing-habit-dashboard--trend-mt 14)
+(defconst writing-habit-dashboard--trend-mb 24)
+(defconst writing-habit-dashboard--trend-top-pct 150)
+
+(defun writing-habit-dashboard--iround (value)
+  "Round VALUE half up to an integer, matching the Python twin."
+  (floor (+ value 0.5)))
+
+(defun writing-habit-dashboard--trend-x (i n)
+  "Return the x coordinate of point I of N points."
+  (let ((plot-w (- writing-habit-dashboard--trend-w
+                   writing-habit-dashboard--trend-ml
+                   writing-habit-dashboard--trend-mr)))
+    (if (<= n 1)
+        (+ writing-habit-dashboard--trend-ml (/ plot-w 2))
+      (+ writing-habit-dashboard--trend-ml
+         (writing-habit-dashboard--iround
+          (/ (* plot-w i) (float (1- n))))))))
+
+(defun writing-habit-dashboard--trend-y (pct)
+  "Return the y coordinate for PCT percent of plan."
+  (let* ((plot-h (- writing-habit-dashboard--trend-h
+                    writing-habit-dashboard--trend-mt
+                    writing-habit-dashboard--trend-mb))
+         (p (cond ((< pct 0) 0)
+                  ((> pct writing-habit-dashboard--trend-top-pct)
+                   writing-habit-dashboard--trend-top-pct)
+                  (t pct))))
+    (- (+ writing-habit-dashboard--trend-mt plot-h)
+       (writing-habit-dashboard--iround
+        (/ (* plot-h p) (float writing-habit-dashboard--trend-top-pct))))))
+
+(defun writing-habit-dashboard--trend (rows)
+  "Return the SVG trend lines of overall adherence for ROWS (oldest first)."
+  (if (null rows)
+      '()
+    (let* ((n (length rows))
+           (i -1)
+           (pts (mapcar
+                 (lambda (r)
+                   (setq i (1+ i))
+                   (list (writing-habit-dashboard--trend-x i n)
+                         (writing-habit-dashboard--trend-y
+                          (writing-habit-dashboard--pct
+                           (cdr (assoc "actual_min" r))
+                           (cdr (assoc "planned_min" r))))
+                         (cdr (assoc "week_start" r))))
+                 rows))
+           (y0 (writing-habit-dashboard--trend-y 0))
+           (y100 (writing-habit-dashboard--trend-y 100))
+           (x-left writing-habit-dashboard--trend-ml)
+           (x-right (- writing-habit-dashboard--trend-w
+                       writing-habit-dashboard--trend-mr))
+           (poly (mapconcat (lambda (p) (format "%d,%d" (nth 0 p) (nth 1 p)))
+                            pts " "))
+           (out (list
+                 "  <h2>Adherence over recent weeks</h2>"
+                 (concat "  <svg viewBox=\"0 0 "
+                         (number-to-string writing-habit-dashboard--trend-w) " "
+                         (number-to-string writing-habit-dashboard--trend-h)
+                         "\" style=\"display:block;width:100%;height:auto;max-width:680px\""
+                         " role=\"img\" aria-label=\"Overall adherence over recent weeks\">")
+                 (format "    <line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"var(--grid)\"/>"
+                         x-left y0 x-right y0)
+                 (format "    <line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"var(--axis)\" stroke-dasharray=\"4 3\"/>"
+                         x-left y100 x-right y100)
+                 (format "    <text x=\"%d\" y=\"%d\" text-anchor=\"end\" font-size=\"10\" fill=\"var(--muted)\">1.0</text>"
+                         (- x-left 4) (+ y100 4))
+                 (format "    <text x=\"%d\" y=\"%d\" text-anchor=\"end\" font-size=\"10\" fill=\"var(--muted)\">0.0</text>"
+                         (- x-left 4) (+ y0 4))
+                 (concat "    <polyline fill=\"none\" stroke=\"var(--planned)\" stroke-width=\"2\" points=\""
+                         poly "\"/>"))))
+      (dolist (p pts)
+        (setq out (append out (list
+          (format "    <circle cx=\"%d\" cy=\"%d\" r=\"3\" fill=\"var(--planned)\"/>"
+                  (nth 0 p) (nth 1 p))))))
+      (dolist (p pts)
+        (setq out (append out (list
+          (concat (format "    <text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--muted)\">"
+                          (nth 0 p) (- writing-habit-dashboard--trend-h 8))
+                  (writing-habit-dashboard--esc (substring (nth 2 p) 5))
+                  "</text>")))))
+      (append out (list
+                   "  </svg>"
+                   (concat "  <p class=\"sub\">Overall adherence, the ratio of actual to planned minutes,"
+                           " for each recent week. The dashed line is on plan.</p>"))))))
+
+
 ;;;; Section builders
 
 (defun writing-habit-dashboard--tiles (planned-total actual-total streak)
@@ -349,6 +446,8 @@
                  "    <button id=\"wh-theme\" class=\"toggle\" type=\"button\">Dark theme</button>"
                  "  </header>")))
     (setq lines (append lines (writing-habit-dashboard--tiles planned-total actual-total streak)))
+    (setq lines (append lines (writing-habit-dashboard--trend
+                               (last (writing-habit-compare-overall-series db nil week) 8))))
     (setq lines (append lines (writing-habit-dashboard--schedule
                                (writing-habit-dashboard--schedule-rows db week-start))))
     (setq lines (append lines (writing-habit-dashboard--projects proj)))

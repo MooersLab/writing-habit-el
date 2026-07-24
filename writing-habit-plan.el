@@ -41,9 +41,11 @@
 ;; Risk tags.  The writing-schedule legend maps a code to a description,
 ;; for example "A: DNPH1 docking".  To give the barbell view a class to
 ;; group on, add a risk tag at the end of the description in either the
-;; org-tag form :safe: or the parenthesis form (safe).  Recognized tags are
-;; safe, speculative, and support.  The tag is stripped before the
-;; description is stored, so it never pollutes the project name.
+;; org-tag form :safe: or the parenthesis form (safe).  The two risk classes
+;; are safe and speculative.  Support is an activity category, not a risk
+;; class, so a legacy support tag is stripped but records no risk class.  The
+;; tag is stripped before the description is stored, so it never pollutes the
+;; project name.
 ;;
 ;; Public functions:
 ;;   `writing-habit-plan-import'        parse a table and load a week's blocks
@@ -82,17 +84,20 @@
 (defun writing-habit-plan--split-risk (description)
   "Return a cons (CLEAN-DESC . RISK) from a legend DESCRIPTION.
 CLEAN-DESC is nil when the description is empty after the tag is removed.
-RISK is a lowercase string, one of \"safe\", \"speculative\", or
-\"support\", or nil."
+RISK is a lowercase string, one of \"safe\" or \"speculative\", or nil.
+Support is an activity category, not a risk class."
   (if (or (null description) (string-empty-p (string-trim description)))
       (cons nil nil)
     (let ((case-fold-search t))
       (if (string-match writing-habit-plan--risk-tag-re description)
-          (let ((risk (downcase (or (match-string 1 description)
+          (let* ((tag (downcase (or (match-string 1 description)
                                     (match-string 2 description))))
-                (clean (string-trim
-                        (replace-regexp-in-string
-                         writing-habit-plan--risk-tag-re "" description))))
+                 ;; Only safe and speculative are risk classes; a legacy support
+                 ;; tag is stripped but records no risk class.
+                 (risk (and (member tag '("safe" "speculative")) tag))
+                 (clean (string-trim
+                         (replace-regexp-in-string
+                          writing-habit-plan--risk-tag-re "" description))))
             (cons (if (string-empty-p clean) nil clean) risk))
         (let ((clean (string-trim description)))
           (cons (if (string-empty-p clean) nil clean) nil))))))
@@ -104,6 +109,16 @@ falls back to \"generative\"."
   (let ((name (cdr (assoc (downcase (string-trim (or section "")))
                           writing-habit-plan--section-to-category))))
     (if name (cons name t) (cons "generative" nil))))
+
+(defun writing-habit-plan--schedule-code (path)
+  "Derive the schedule file-name code from a table PATH.
+Strips the directory and the .org extension, and an optional leading ISO date
+prefix, so 2026-01-19_4gAAeAsA-gWW.org yields 4gAAeAsA-gWW and my-week.org yields
+my-week."
+  (let ((stem (file-name-base path)))
+    (if (string-match "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}[_-]\\(.+\\)\\'" stem)
+        (match-string 1 stem)
+      stem)))
 
 (defun writing-habit-plan-parse-file (path)
   "Return the writing-schedule parse plist for the org table in PATH.
@@ -149,6 +164,11 @@ import of the same week is a no-op."
                     "(day, start_time, end_time, project_id, category_id)"
                     " VALUES (?, ?, ?, ?, ?)")
          (list day (plist-get ev :start) (plist-get ev :end) pid cat-id))))
+    ;; Record which schedule file produced this week, for the grouping dashboard.
+    (sqlite-execute
+     db (concat "INSERT OR REPLACE INTO plan_week(week_start, schedule_code, table_path)"
+                " VALUES (?, ?, ?)")
+     (list monday-iso (writing-habit-plan--schedule-code path) path))
     (let ((count (caar (sqlite-select
                         db "SELECT COUNT(*) FROM plan_block WHERE week_start = ?"
                         (list monday-iso)))))

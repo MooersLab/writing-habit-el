@@ -56,6 +56,8 @@
 (require 'writing-habit-compare)
 (require 'writing-habit-report)
 (require 'writing-habit-dashboard)
+(require 'writing-habit-context)
+(require 'writing-habit-seasons)
 
 (defconst writing-habit-version "0.0.0"
   "Version of the writing-habit Emacs Lisp package.")
@@ -93,6 +95,8 @@ Safe to run on an existing database."
    ["Review"
     ("r" "Weekly report"          writing-habit-report-week)
     ("D" "HTML dashboard"         writing-habit-dashboard)
+    ("S" "Seasons dashboard"      writing-habit-seasons)
+    ("t" "Tag a week's context"   writing-habit-context-set-interactive)
     ("n" "Decode a schedule code" writing-habit-name)]])
 
 
@@ -204,7 +208,38 @@ entry point, factored out so it can be tested directly."
              (progn (writing-habit-dashboard-write db week out)
                     (format "Wrote dashboard to %s" out))
            (writing-habit-db-close db))))
-      (_ (error "Unknown command %S; use initdb, plan, track, compare, dashboard, or name"
+      ("seasons"
+       (let ((out (writing-habit--req opts "out"))
+             (db (writing-habit-db-connect (writing-habit--req opts "db"))))
+         (unwind-protect
+             (progn (writing-habit-seasons-write db out)
+                    (format "Wrote seasons dashboard to %s" out))
+           (writing-habit-db-close db))))
+      ("context"
+       (let ((db (writing-habit-db-connect (writing-habit--req opts "db"))))
+         (unwind-protect
+             (pcase (nth 1 pos)
+               ("set"
+                (writing-habit-context-set
+                 db (writing-habit--req opts "week") (writing-habit--req opts "tag")
+                 (writing-habit--opt opts "note"))
+                (format "Tagged the week of %s with %s"
+                        (writing-habit--req opts "week") (writing-habit--req opts "tag")))
+               ("clear"
+                (format "Cleared %d tag(s) from the week of %s"
+                        (writing-habit-context-clear
+                         db (writing-habit--req opts "week") (writing-habit--opt opts "tag"))
+                        (writing-habit--req opts "week")))
+               ("list"
+                (mapconcat
+                 (lambda (r)
+                   (format "%s  %s%s" (nth 0 r) (nth 1 r)
+                           (if (nth 2 r) (concat "  " (nth 2 r)) "")))
+                 (writing-habit-context-list db (writing-habit--opt opts "week"))
+                 "\n"))
+               (_ (error "Usage: context set|clear|list ...")))
+           (writing-habit-db-close db))))
+      (_ (error "Unknown command %S; use initdb, plan, track, compare, dashboard, seasons, context, or name"
                 (or cmd ""))))))
 
 ;;;###autoload

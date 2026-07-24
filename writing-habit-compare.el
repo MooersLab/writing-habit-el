@@ -31,6 +31,7 @@
 ;;   `writing-habit-compare-week-barbell'   planned versus actual per risk class
 ;;   `writing-habit-compare-day-actual'     actual minutes per day
 ;;   `writing-habit-compare-current-streak' run of consecutive worked days
+;;   `writing-habit-compare-overall-series'  overall adherence per week
 
 ;;; Code:
 
@@ -54,6 +55,10 @@
 (defconst writing-habit-compare--day-columns
   '("day" "week_start" "actual_min" "worked")
   "Column order of v_day_actual.")
+
+(defconst writing-habit-compare--overall-columns
+  '("week_start" "planned_min" "actual_min" "adherence")
+  "Column order of v_week_overall.")
 
 
 ;;;; Date helpers (calendar math, so no timezone surprises)
@@ -129,6 +134,59 @@ Zero when no day has any recorded minutes."
               (setq stop t)))
           (setq rev (cdr rev)))
         streak))))
+
+(defun writing-habit-compare-overall-series (db &optional start end)
+  "Overall adherence per week from v_week_overall, oldest first.
+START and END, when non-nil, are any dates inside the first and last week
+to include."
+  (let ((sql "SELECT * FROM v_week_overall")
+        (clauses '())
+        (params '()))
+    (when start
+      (push "week_start >= ?" clauses)
+      (push (writing-habit-compare--monday start) params))
+    (when end
+      (push "week_start <= ?" clauses)
+      (push (writing-habit-compare--monday end) params))
+    (when clauses
+      (setq sql (concat sql " WHERE "
+                        (mapconcat #'identity (nreverse clauses) " AND "))))
+    (setq sql (concat sql " ORDER BY week_start"))
+    (writing-habit-compare--rows db sql (nreverse params)
+                                 writing-habit-compare--overall-columns)))
+
+
+;;;; Grouping readers for the second dashboard (build step 3)
+
+(defconst writing-habit-compare--month-columns
+  '("month" "planned_min" "actual_min" "weeks" "adherence")
+  "Column order of v_month_overall.")
+
+(defconst writing-habit-compare--context-columns
+  '("tag" "planned_min" "actual_min" "weeks" "adherence")
+  "Column order of v_context_overall.")
+
+(defconst writing-habit-compare--schedule-columns
+  '("schedule_code" "planned_min" "actual_min" "weeks" "adherence")
+  "Column order of v_schedule_overall.")
+
+(defun writing-habit-compare-month-overall (db)
+  "Overall adherence per calendar month from DB."
+  (writing-habit-compare--rows
+   db "SELECT * FROM v_month_overall ORDER BY month" nil
+   writing-habit-compare--month-columns))
+
+(defun writing-habit-compare-context-overall (db)
+  "Overall adherence per event-context tag from DB."
+  (writing-habit-compare--rows
+   db "SELECT * FROM v_context_overall ORDER BY tag" nil
+   writing-habit-compare--context-columns))
+
+(defun writing-habit-compare-schedule-overall (db)
+  "Overall adherence per schedule code from DB."
+  (writing-habit-compare--rows
+   db "SELECT * FROM v_schedule_overall ORDER BY schedule_code" nil
+   writing-habit-compare--schedule-columns))
 
 (provide 'writing-habit-compare)
 ;;; writing-habit-compare.el ends here

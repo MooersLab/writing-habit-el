@@ -60,7 +60,7 @@
   (should (equal (writing-habit-plan--split-risk "2026words (speculative)")
                  '("2026words" . "speculative")))
   (should (equal (writing-habit-plan--split-risk "email :SUPPORT:")
-                 '("email" . "support")))
+                 '("email")))
   (should (equal (writing-habit-plan--split-risk "no tag here")
                  '("no tag here" . nil)))
   (should (equal (writing-habit-plan--split-risk nil) '(nil)))

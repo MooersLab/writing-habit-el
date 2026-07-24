@@ -38,7 +38,7 @@ EM 20, on four consecutive days beginning 2026-01-19."
     (writing-habit-db-init db writing-habit-compare-tests--schema)
     (let ((a (writing-habit-db-get-or-create-project db "A" "DNPH1 docking" "safe"))
           (w (writing-habit-db-get-or-create-project db "W" "2026words" "speculative"))
-          (em (writing-habit-db-get-or-create-project db "EM" "email" "support"))
+          (em (writing-habit-db-get-or-create-project db "EM" "email"))
           (gen (writing-habit-db-get-category-id db "generative")))
       ;; Plan blocks.
       (dolist (row (list (list "2026-01-19" "04:00" "05:30" a gen)

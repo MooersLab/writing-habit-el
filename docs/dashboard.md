@@ -41,11 +41,11 @@ same chart directly to a PNG for batch use. The plot needs `python3` with
 
 `M-x writing-habit-dashboard` writes a self-contained page and opens it in a
 browser. The page embeds its own style and script, so it opens with no server
-and no network request. The page has four sections below the summary tiles,
-namely the week's schedule redrawn as a time-by-day grid colored by activity,
-the planned-versus-actual comparison by project with a two-bar meter and an
-adherence column, the activity balance, and the barbell split with the
-speculative share.
+and no network request. The page has five sections below the summary tiles,
+namely a trend of overall adherence over recent weeks, the week's schedule
+redrawn as a time-by-day grid colored by activity, the planned-versus-actual
+comparison by project with a two-bar meter and an adherence column, the activity
+balance, and the barbell split with the speculative share.
 
 ![The dashboard, light theme.](imgs/dashboard-light.png)
 
@@ -61,6 +61,17 @@ sit far apart for colorblind readers. Every value appears as a direct label in
 ink, never by color alone, and the schedule is a labeled table, so the page
 reads without relying on color. The dashboard rounds the speculative-share
 percent half up, so a share of 12.5 percent reads as 13.
+
+## The seasons dashboard
+
+A second dashboard groups adherence across many weeks rather than within one.
+`M-x writing-habit-seasons` writes a self-contained page with three tables:
+adherence by calendar month for seasonal trends, adherence by event-context tag,
+and adherence by the schedule file-name code so plan shapes can be compared. Tag
+a week with `M-x writing-habit-context-set`, and the schedule code is captured at
+plan import from the table file name. The page reuses the weekly dashboard's
+style, so the two read as one, and the Python twin renders it byte for byte from
+the same database.
 
 ## Byte-identical to the Python twin
 

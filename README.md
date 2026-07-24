@@ -2,14 +2,13 @@
 
 ![Version](https://img.shields.io/static/v1?label=writing-habit-el&message=0.1.0&color=brightcolor)
 [![CI](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml/badge.svg)](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml)
-[![Code License: MIT](https://img.shields.io/badge/Code_License-MIT-yellow.svg)](https://github.com/MooersLab/writing-habit-el/blob/main/LICENSE)
-[![Image License: CC BY 4.0](https://img.shields.io/badge/Image_License-CC_BY_4.0-lightgrey.svg)](https://github.com/MooersLab/writing-habit-el/blob/main/assets/images/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Emacs](https://img.shields.io/badge/Emacs-29.1%2B-7F5AB6.svg?logo=gnuemacs&logoColor=white)](https://www.gnu.org/software/emacs/)
 <!-- [![MELPA](https://melpa.org/packages/writing-habit-badge.svg)](https://melpa.org/#/writing-habit) -->
 
 Track and compare planned versus actual academic writing effort, without leaving Emacs.
 
-`writing-habit` is the Emacs Lisp companion to [writing-schedule.el](https://github.com/MooersLab/writing-schedule) and a port of the Python [writing-habit](https://github.com/MooersLab/writing-habit-py) package. `writing-schedule` builds a weekly plan; `writing-habit` records what you actually did and shows you the gaps. It records self-reported effort, not verified focus. The accuracy of the data is left to the user.
+`writing-habit` is the Emacs Lisp companion to [writing-schedule.el](https://github.com/MooersLab/writing-schedule) and a port of the Python [writing-habit](https://github.com/MooersLab/writing-habit) package. `writing-schedule` builds a weekly plan; `writing-habit` records what you actually did and shows you the gaps. It records self-reported effort, not verified focus. The accuracy of the data is left to the user.
 
 The three stages share one SQLite database defined in `schema.sql`, the single contract between them:
 
@@ -19,19 +18,15 @@ The three stages share one SQLite database defined in `schema.sql`, the single c
 
 Because the schema is the contract, the database this package writes is byte-for-byte the same one the Python package writes, so either tool can read what the other recorded.
 
-![The plan, track, and compare stages read and write one SQLite database whose schema is the shared contract.](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/architecture.png)
-
 ## Screenshots
 
-The weekly HTML dashboard, in its light theme and its dark theme:
+The weekly HTML dashboard, with a light and a dark theme:
 
-![Dashboard, light theme](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/dashboard-light.png)
-
-![Dashboard, dark theme](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/dashboard-dark.png)
+![Dashboard](imgs/dashboard-light.png)
 
 The optional planned-versus-actual chart from the compare stage:
 
-![Planned versus actual](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/plot.png)
+![Planned versus actual](imgs/plot.png)
 
 ## Why an Emacs version
 
@@ -96,8 +91,6 @@ To enable `plan import`, also install `writing-schedule.el` and make sure it is 
 
 Open the menu with `M-x writing-habit` and work down it, or run the commands directly.
 
-![The weekly loop: create a database once, import the plan, track through the week, and review at the end.](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/workflow-loop.png)
-
 1. Create a database. `M-x writing-habit-initdb` prompts for a file name and seeds the schema.
 2. Import a weekly plan. `M-x writing-habit-plan-import-file` reads a filled `writing-schedule` table for a week.
 3. Record actual sessions. Use `M-x writing-habit-track-add-to-file` for a quick end-of-day entry, `writing-habit-track-import-csv-file` for the tracking CSV, `writing-habit-track-import-ics-file` for a calendar, or `writing-habit-track-harvest-clock-file` to pull in completed org-clock entries.
@@ -120,6 +113,8 @@ writing-habit
   Review
     r  Weekly report
     D  HTML dashboard
+    S  Seasons dashboard
+    t  Tag a week's context
     n  Decode a schedule code
 ```
 
@@ -136,6 +131,8 @@ writing-habit
 | `writing-habit-track-harvest-clock-file` | Harvest completed org-clock entries |
 | `writing-habit-report-week` | Show the weekly comparison as an org buffer |
 | `writing-habit-dashboard` | Write and open the HTML dashboard |
+| `writing-habit-seasons` | Write and open the seasons dashboard, grouped by month, context, and schedule |
+| `writing-habit-context-set-interactive` | Tag a week with an event context |
 | `writing-habit-name` | Decode a schedule code and check it against a legend |
 
 ## Batch use from a shell
@@ -157,6 +154,9 @@ emacs --batch -l writing-habit -f writing-habit-batch \
       compare --week 2026-01-19 --plot week.png --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch \
       dashboard --week 2026-01-19 --out week.html --db habit.db
+emacs --batch -l writing-habit -f writing-habit-batch \
+      context set --week 2026-02-02 --tag teaching --db habit.db
+emacs --batch -l writing-habit -f writing-habit-batch seasons --out seasons.html --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch name 4gAAeAsA-gWW --table my-week.org
 ```
 
@@ -179,7 +179,7 @@ The harvest is idempotent, so running it again over the same clocks inserts noth
 
 ## Marking safe and speculative projects
 
-To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. Recognized tags are `safe`, `speculative`, and `support`.
+To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. The two risk classes are `safe` and `speculative`. Support is an activity category, not a risk class, so a support project carries no risk tag.
 
 ```org
 | A: DNPH1 docking :safe:      |  |  |  |  |  |
@@ -192,8 +192,6 @@ Inside a table cell `:safe:` is literal text, because org reads `:tag:` syntax o
 
 A weekly table can be named by a compact code that encodes the whole week, for example `4gAAeAsA-gWW.org`. Lowercase letters are activities (`g` generative, `e` editing, `s` support), uppercase letters are projects (one letter is one block), and a digit at the start of a group is the count of consecutive days. A hyphen separates day groups, and `o` is an open day. The full specification is in `docs/table-file-naming-rules.org`.
 
-![The code 4gAAeAsA-gWW read token by token into a week of blocks.](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/schedule-code.png)
-
 ```
 M-x writing-habit-name RET 4gAAeAsA-gWW RET
 ```
@@ -203,8 +201,6 @@ With a prefix argument the command also prompts for a table file and checks the 
 ## Data model and interoperability
 
 Everything the three stages share lives in `schema.sql`: reference tables for the activities and projects, fact tables for planned blocks and actual sessions, generated columns for the block duration and the week's Monday, and four comparison views. The database is portable, so a session written here reads identically through the Python package, and the reverse holds too, because neither port owns the schema. When the schema changes, it changes in `schema.sql`, and both ports pick it up.
-
-![Two reference tables, three fact tables, and four comparison views.](https://raw.githubusercontent.com/MooersLab/writing-habit-el/main/assets/images/schema-er.png)
 
 Because Emacs runs only the first statement of a multi-statement string through `sqlite-execute`, `writing-habit-db-init` splits the schema into statements before running them. The schema's string literals contain no semicolons, so the split is safe.
 
@@ -250,7 +246,7 @@ A committed fixture, a database built by the Python port, is read back through t
 ## Relationship to the other packages
 
 - [writing-schedule.el](https://github.com/MooersLab/writing-schedule) builds the weekly plan and exports it to iCalendar. `writing-habit` reuses its parser for the plan stage.
-- The Python [writing-habit](https://github.com/MooersLab/writing-habit-py) package is the twin of this one. It shares the schema and the schedule-code specification, so the two interoperate on one database file and produce byte-identical dashboards.
+- The Python [writing-habit](https://github.com/MooersLab/writing-habit) package is the twin of this one. It shares the schema and the schedule-code specification, so the two interoperate on one database file and produce byte-identical dashboards.
 
 ## Contributing
 
@@ -262,11 +258,7 @@ Under active development, and not yet on MELPA. The interfaces may still change.
 
 ## License
 
-This project uses split licensing.
-
-Source code is licensed under the MIT License; see [`LICENSE`](https://github.com/MooersLab/writing-habit-el/blob/main/LICENSE).
-
-Images in `assets/images/` are licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0); see [`assets/images/LICENSE`](https://github.com/MooersLab/writing-habit-el/blob/main/assets/images/LICENSE). The Creative Commons portion covers all of the generated figures, namely the architecture and schema diagrams, the weekly-loop and schedule-code figures, the planned-versus-actual chart, and the dashboard screenshots. Each image carries its CC BY 4.0 attribution embedded in the file metadata, so a figure reused in a manuscript keeps its license and credit. A suggested attribution is: "writing-habit" figures by Blaine H. M. Mooers, licensed under CC BY 4.0, https://github.com/MooersLab/writing-habit-el.
+MIT. See [LICENSE](LICENSE).
 
 ## Sources of funding
 
