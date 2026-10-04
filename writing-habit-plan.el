@@ -41,8 +41,9 @@
 ;; Risk tags.  The writing-schedule legend maps a code to a description,
 ;; for example "A: DNPH1 docking".  To give the barbell view a class to
 ;; group on, add a risk tag at the end of the description in either the
-;; org-tag form :safe: or the parenthesis form (safe).  The two risk classes
-;; are safe and speculative.  Support is an activity category, not a risk
+;; org-tag form :safe: or the parenthesis form (safe).  The two tags are
+;; :safe: and :risky:, and :risky: names the class the database calls
+;; speculative.  Support is an activity category, not a risk
 ;; class, so a legacy support tag is stripped but records no risk class.  The
 ;; tag is stripped before the description is stored, so it never pollutes the
 ;; project name.
@@ -57,6 +58,7 @@
 (require 'subr-x)
 (require 'cl-lib)
 (require 'writing-habit-db)
+(require 'writing-habit-name)   ; for the tag to risk-class map
 
 (declare-function writing-schedule--parse "writing-schedule" (table))
 (declare-function writing-schedule--week-monday "writing-schedule" (time))
@@ -78,7 +80,7 @@
   "Map a lower-case writing-schedule section header to an activity category.")
 
 (defconst writing-habit-plan--risk-tag-re
-  "\\(?:(\\(safe\\|speculative\\|support\\))\\|:\\(safe\\|speculative\\|support\\):\\)[ \t]*\\'"
+  "\\(?:(\\(safe\\|risky\\|support\\))\\|:\\(safe\\|risky\\|support\\):\\)[ \t]*\\'"
   "Match a trailing risk tag in either the (safe) or :safe: form.")
 
 (defun writing-habit-plan--split-risk (description)
@@ -94,7 +96,7 @@ Support is an activity category, not a risk class."
                                     (match-string 2 description))))
                  ;; Only safe and speculative are risk classes; a legacy support
                  ;; tag is stripped but records no risk class.
-                 (risk (and (member tag '("safe" "speculative")) tag))
+                 (risk (cdr (assoc tag writing-habit-name-tag-to-risk)))
                  (clean (string-trim
                          (replace-regexp-in-string
                           writing-habit-plan--risk-tag-re "" description))))
@@ -112,9 +114,9 @@ falls back to \"generative\"."
 
 (defun writing-habit-plan--schedule-code (path)
   "Derive the schedule file-name code from a table PATH.
-Strips the directory and the .org extension, and an optional leading ISO date
-prefix, so 2026-01-19_4gAAeAsA-gWW.org yields 4gAAeAsA-gWW and my-week.org yields
-my-week."
+Strips the directory, the .org extension, and an optional leading ISO
+date prefix, so 2026-01-19_4gAAeAsA-gWW.org yields 4gAAeAsA-gWW and
+my-week.org yields my-week."
   (let ((stem (file-name-base path)))
     (if (string-match "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}[_-]\\(.+\\)\\'" stem)
         (match-string 1 stem)

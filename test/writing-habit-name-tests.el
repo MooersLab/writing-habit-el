@@ -92,5 +92,105 @@
                   (writing-habit-name-decode "gZ") legend)))
       (should (equal problems '("Z"))))))
 
+;;;; Encoding
+;;
+;; A one-to-one port of tests/test_gui... no: of the encoder tests in
+;; tests/test_name_encode.py.  The property that matters is that the encoder
+;; inverts the decoder for every canonical code, so the two ports name a week
+;; alike and the tracker groups it under one schedule shape.
+
+(defconst writing-habit-name-tests--canonical
+  '("5gA"
+    "5gAA"
+    "4gAAeAsA-gWW"
+    "2gAAeA-o-2gW"
+    "gA-o-gA-o-gA"
+    "2gAsBBBsCCCsD-2gAsBBBsCCCsE-gWsBBBsCCC-sDDDsEEE"
+    "3o-gHgAeCsIsB"
+    "o")
+  "Codes already in canonical form, which must survive a round trip.")
+
+(ert-deftest writing-habit-name-encode-inverts-decode ()
+  "Encoding the decoded week returns the code it came from."
+  (dolist (code writing-habit-name-tests--canonical)
+    (should (equal (writing-habit-name-encode
+                    (writing-habit-name-decode code))
+                   code))))
+
+(ert-deftest writing-habit-name-encode-accepts-bare-block-lists ()
+  "A list of block lists, one per day, needs no day names."
+  (should (equal (writing-habit-name-encode
+                  '(( ("generative" . "A") ) () ( ("generative" . "A") )))
+                 "gA-o-gA")))
+
+(ert-deftest writing-habit-name-encode-accepts-activity-letters ()
+  "An activity may be given as its letter rather than its name."
+  (should (equal (writing-habit-name-encode '(( ("g" . "A") ("e" . "A") )))
+                 "gAeA")))
+
+(ert-deftest writing-habit-name-encode-collapses-only-consecutive-days ()
+  "Identical days that are not adjacent are written out again."
+  (let ((day '(("generative" . "A"))))
+    (should (equal (writing-habit-name-encode (list day day day)) "3gA"))
+    (should (equal (writing-habit-name-encode (list day '() day)) "gA-o-gA"))))
+
+(ert-deftest writing-habit-name-encode-omits-a-count-of-one ()
+  (should (equal (writing-habit-name-encode
+                  '(( ("generative" . "W") ("generative" . "W") )))
+                 "gWW")))
+
+(ert-deftest writing-habit-name-encode-drops-trailing-open-days ()
+  (let ((day '(("generative" . "A"))))
+    (should (equal (writing-habit-name-encode (list day '() '())) "gA"))
+    (should (equal (writing-habit-name-encode (list '() '())) "o"))))
+
+(ert-deftest writing-habit-name-encode-repeats-the-activity-at-a-project-change ()
+  "Support on B, then C, then D reads sBBBsCCCsD, not sBBBCCCD."
+  (should (equal (writing-habit-name-encode
+                  '(( ("support" . "B") ("support" . "B") ("support" . "B")
+                      ("support" . "C") ("support" . "C") ("support" . "C")
+                      ("support" . "D") )))
+                 "sBBBsCCCsD"))
+  (should (equal (writing-habit-name-encode
+                  '(( ("generative" . "A") ("generative" . "A")
+                      ("generative" . "B") )))
+                 "gAAgB")))
+
+(ert-deftest writing-habit-name-encode-day-patterns ()
+  (should (equal (writing-habit-name-encode-day '()) "o"))
+  (should (equal (writing-habit-name-encode-day
+                  '(("generative" . "A") ("generative" . "A"))) "gAA"))
+  (should (equal (writing-habit-name-encode-day
+                  '(("generative" . "A") ("editing" . "A") ("support" . "A")))
+                 "gAeAsA")))
+
+(ert-deftest writing-habit-name-encode-rejects-bad-input ()
+  (should-error (writing-habit-name-encode '()))
+  (should-error (writing-habit-name-encode '(( ("dreaming" . "A") ))))
+  (should-error (writing-habit-name-encode '(( ("generative" . "a") ))))
+  (should-error (writing-habit-name-encode '(( ("generative" . "AB") ))))
+  (should-error (writing-habit-name-encode
+                 (make-list 8 '(("generative" . "A"))))))
+
+
+;;;; The risk tag
+
+(ert-deftest writing-habit-name-risky-tag-names-the-speculative-class ()
+  "The tag in a table reads :risky:; the class the database stores does not."
+  (let ((file (make-temp-file "wh-legend" nil ".org")))
+    (unwind-protect
+        (progn
+          (with-temp-file file
+            (insert "| A: one :safe: |  |\n"
+                    "| B: two :risky: |  |\n"
+                    "| C: three :speculative: |  |\n"))
+          (let ((legend (writing-habit-name-read-legend file)))
+            (should (equal (nth 1 (cdr (assoc "A" legend))) "safe"))
+            (should (equal (nth 1 (cdr (assoc "B" legend))) "speculative"))
+            ;; The old tag no longer names a class, so it stays in the text.
+            (should (equal (nth 1 (cdr (assoc "C" legend))) nil))
+            (should (equal (nth 0 (cdr (assoc "C" legend))) "three :speculative:"))))
+      (delete-file file))))
+
 (provide 'writing-habit-name-tests)
 ;;; writing-habit-name-tests.el ends here

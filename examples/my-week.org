@@ -12,6 +12,6 @@
 |-------------+----+----+----+----+----+----|
 | A: DNPH1 docking :safe:      |  |  |  |  |  |
 | B: DUSP1 radiation :safe:    |  |  |  |  |  |
-| W: 2026words :speculative:   |  |  |  |  |  |
+| W: 2026words :risky:   |  |  |  |  |  |
 | TT: teaching                 |  |  |  |  |  |
 | EM: email                    |  |  |  |  |  |

@@ -62,7 +62,8 @@ shown when there are no rows."
                     "</td><td>" (writing-habit-dashboard--meter
                                  (cdr (assoc "planned_min" r)) (cdr (assoc "actual_min" r)) scale)
                     "</td><td class=\"num\">"
-                    (writing-habit-dashboard--fmt2 (cdr (assoc "adherence" r)))
+                    (writing-habit-dashboard--ratio (cdr (assoc "actual_min" r))
+                                                    (cdr (assoc "planned_min" r)))
                     "</td></tr>")))))
         (append out (list "    </tbody>" "  </table>"))))))
 

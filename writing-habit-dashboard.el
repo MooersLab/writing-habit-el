@@ -143,7 +143,12 @@
   (if (null value) "n/a" (format "%.2f" value)))
 
 (defun writing-habit-dashboard--ratio (actual planned)
-  "Format ACTUAL over PLANNED to two places, or \"n/a\" when PLANNED is zero."
+  "Format ACTUAL over PLANNED to two places, or \"n/a\" when PLANNED is zero.
+Every displayed ratio is computed here rather than read from the adherence
+column of a view, because ROUND in SQL is not portable.  SQLite has changed
+its rounding of a value such as 510/1200, which is exactly 0.425, so the
+same database rendered on two machines produced two different pages and the
+cross-port fixture failed on whichever machine did not write it."
   (if (and planned (> planned 0)) (format "%.2f" (/ (float actual) planned)) "n/a"))
 
 (defun writing-habit-dashboard--meter (planned actual scale)
@@ -355,7 +360,8 @@
                     "</td><td>" (writing-habit-dashboard--meter
                                  (cdr (assoc "planned_min" r)) (cdr (assoc "actual_min" r)) scale)
                     "</td><td class=\"num\">"
-                    (writing-habit-dashboard--fmt2 (cdr (assoc "adherence" r)))
+                    (writing-habit-dashboard--ratio (cdr (assoc "actual_min" r))
+                                                    (cdr (assoc "planned_min" r)))
                     "</td></tr>")))))
         (append out (list "    </tbody>" "  </table>"
                           (concat "  <div class=\"legend\">"

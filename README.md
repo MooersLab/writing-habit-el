@@ -179,11 +179,11 @@ The harvest is idempotent, so running it again over the same clocks inserts noth
 
 ## Marking safe and speculative projects
 
-To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. The two risk classes are `safe` and `speculative`. Support is an activity category, not a risk class, so a support project carries no risk tag.
+To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. The two tags are `:safe:` and `:risky:`, and `:risky:` names the class the database calls `speculative`. Support is an activity category, not a risk class, so a support project carries no risk tag.
 
 ```org
 | A: DNPH1 docking :safe:      |  |  |  |  |  |
-| W: 2026words :speculative:   |  |  |  |  |  |
+| W: 2026words :risky:   |  |  |  |  |  |
 ```
 
 Inside a table cell `:safe:` is literal text, because org reads `:tag:` syntax only on headlines, so it does not affect the table or its export. The plan importer strips the tag before storing the description.

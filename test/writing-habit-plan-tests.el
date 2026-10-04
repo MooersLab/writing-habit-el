@@ -57,8 +57,14 @@
   "A trailing risk tag is split out in either form, leaving a clean name."
   (should (equal (writing-habit-plan--split-risk "DNPH1 docking :safe:")
                  '("DNPH1 docking" . "safe")))
-  (should (equal (writing-habit-plan--split-risk "2026words (speculative)")
+  ;; :risky: is the tag a writer types; speculative is the class it names.
+  (should (equal (writing-habit-plan--split-risk "2026words (risky)")
                  '("2026words" . "speculative")))
+  (should (equal (writing-habit-plan--split-risk "2026words :risky:")
+                 '("2026words" . "speculative")))
+  ;; The old tag no longer names a class, so it stays in the description.
+  (should (equal (writing-habit-plan--split-risk "2026words (speculative)")
+                 '("2026words (speculative)" . nil)))
   (should (equal (writing-habit-plan--split-risk "email :SUPPORT:")
                  '("email")))
   (should (equal (writing-habit-plan--split-risk "no tag here")

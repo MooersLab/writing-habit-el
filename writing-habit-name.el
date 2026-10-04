@@ -32,12 +32,15 @@
 ;;     project  = A..Z               (one letter is one block)
 ;;     count    = digits             (consecutive days, a leading 1 is omitted)
 ;;
-;; This module decodes a code into the week it represents and checks the
-;; project letters against a weekly table legend.
+;; This module decodes a code into the week it represents, encodes a week
+;; back into its canonical code, and checks the project letters against a
+;; weekly table legend.
 ;;
 ;; Entry points:
 ;;   `writing-habit-name'                interactive command, shows a report
 ;;   `writing-habit-name-decode'         code -> alist of (DAY . BLOCKS)
+;;   `writing-habit-name-encode'         week -> the canonical code
+;;   `writing-habit-name-encode-day'     one day of blocks -> its pattern
 ;;   `writing-habit-name-summary'        block totals by activity and project
 ;;   `writing-habit-name-read-legend'    read a weekly table legend
 ;;   `writing-habit-name-check-against-legend'  match letters to the legend
@@ -64,8 +67,15 @@
   "Match a legend cell: an uppercase code, a colon, then a description.")
 
 (defconst writing-habit-name--risk-re
-  "\\(?:(\\(safe\\|speculative\\|support\\))\\|:\\(safe\\|speculative\\|support\\):\\)[ \t]*\\'"
+  "\\(?:(\\(safe\\|risky\\|support\\))\\|:\\(safe\\|risky\\|support\\):\\)[ \t]*\\'"
   "Match a trailing risk tag in either the (safe) or :safe: form.")
+
+(defconst writing-habit-name-tag-to-risk
+  '(("safe" . "safe") ("risky" . "speculative"))
+  "Map the tag a writer types to the risk class the database stores.
+The class keeps the name \"speculative\", which the schema and both
+dashboards use, while the tag in a table reads :risky:.  Support is an
+activity category rather than a class, so it names nothing.")
 
 
 ;;;; Decoding
@@ -145,6 +155,82 @@ an activity name or a project letter to its block count."
     (list total act proj)))
 
 
+;;;; Encoding
+
+(defconst writing-habit-name-risk-to-tag
+  '(("safe" . "safe") ("speculative" . "risky"))
+  "Map the stored risk class to the tag written in a table.")
+
+(defun writing-habit-name--activity-letter (activity)
+  "Return the code letter for ACTIVITY, which is a name or a letter string."
+  (or (car (rassoc activity writing-habit-name-activities))
+      (and (= (length activity) 1)
+           (assq (aref activity 0) writing-habit-name-activities)
+           (aref activity 0))
+      (error "Unknown activity %S" activity)))
+
+(defun writing-habit-name-encode-day (blocks)
+  "Return the day-pattern for BLOCKS, for example \"gAAeAsA\" or \"o\".
+BLOCKS is a list of cons cells (ACTIVITY . PROJECT) in the order the
+blocks occur across the day.  A run covers consecutive blocks that share
+both the activity and the project, so three support blocks on B give
+\"sBBB\".  A change of project opens a new run and repeats the activity
+letter, so support on B then C then D reads \"sBBBsCCCsD\"."
+  (if (null blocks)
+      "o"
+    (let ((out '()) (current nil))
+      (dolist (b blocks)
+        (let ((letter (writing-habit-name--activity-letter (car b)))
+              (project (cdr b)))
+          (unless (and (stringp project) (= (length project) 1)
+                       (<= ?A (aref project 0)) (<= (aref project 0) ?Z))
+            (error "Project must be one uppercase letter, got %S" project))
+          (unless (equal (cons letter project) current)
+            (push (char-to-string letter) out)
+            (setq current (cons letter project)))
+          (push project out)))
+      (apply #'concat (nreverse out)))))
+
+(defun writing-habit-name-encode (week)
+  "Return the canonical schedule code for WEEK.
+WEEK is either the alist `writing-habit-name-decode' returns or a bare
+list of block lists, one per day, filled from Monday.  Every maximal run
+of identical consecutive days collapses into one group carrying the day
+count, a count of one is omitted, and trailing open days are dropped
+because they are implied.  Days that share a pattern without being
+adjacent are written out again, so a Monday, Wednesday, Friday week reads
+\"gA-o-gA-o-gA\".  The function inverts `writing-habit-name-decode' for
+every canonical code."
+  (when (null week)
+    (error "Empty week"))
+  (when (> (length week) 7)
+    (error "Week covers %d days, more than a week" (length week)))
+  (let ((patterns
+         (mapcar (lambda (day)
+                   (writing-habit-name-encode-day
+                    (if (and (consp day) (stringp (car day))
+                             (member (car day) writing-habit-name-days))
+                        (cdr day)
+                      day)))
+                 week)))
+    ;; Trailing open days are implied, so drop them.
+    (setq patterns (nreverse patterns))
+    (while (and patterns (string= (car patterns) "o"))
+      (setq patterns (cdr patterns)))
+    (setq patterns (nreverse patterns))
+    (if (null patterns)
+        "o"
+      (let ((groups '()) (run 1) (i 0) (n (length patterns)))
+        (while (< i n)
+          (let ((pat (nth i patterns)))
+            (if (and (< (1+ i) n) (string= (nth (1+ i) patterns) pat))
+                (setq run (1+ run))
+              (push (if (> run 1) (format "%d%s" run pat) pat) groups)
+              (setq run 1)))
+          (setq i (1+ i)))
+        (mapconcat #'identity (nreverse groups) "-")))))
+
+
 ;;;; Legend reading and checking
 
 (defun writing-habit-name-read-legend (table-path)
@@ -175,9 +261,9 @@ example |A: DNPH1 docking :safe:|.  A trailing risk tag is stripped."
                     (when (string-match writing-habit-name--risk-re desc)
                       (let ((tag (downcase (or (match-string 1 desc)
                                                (match-string 2 desc)))))
-                        ;; Only safe and speculative are risk classes; a legacy
-                        ;; support tag is stripped but records no risk.
-                        (setq risk (and (member tag '("safe" "speculative")) tag)))
+                        ;; Only safe and risky name a class; a legacy support
+                        ;; tag is stripped but records no risk.
+                        (setq risk (cdr (assoc tag writing-habit-name-tag-to-risk))))
                       (setq desc (string-trim
                                   (replace-regexp-in-string
                                    writing-habit-name--risk-re "" desc)))))

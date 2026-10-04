@@ -1,0 +1,262 @@
+#+TITLE: Plan for leveling up writing-habit-el to match writing-habit
+#+AUTHOR: Blaine Mooers
+#+OPTIONS: toc:nil num:nil author:nil
+#+STARTUP: noindent overview
+#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+LaTeX_HEADER: \usepackage{booktabs}
+#+LaTeX_HEADER: \usepackage{minted}
+
+* Revision note
+#+INDEX: revision history
+
+Revision 2 on 2026-10-04 adds the two scheduler repositories, writing-schedule (Emacs Lisp) and writing-schedule-py, to the survey. They change the plan in three ways. First, the overlap test, the time parser, the day parser, and the template scaffold that the Python GUI imports from writing_schedule already exist in writing-schedule.el. They are private, double-dash functions, so a new Phase 1 promotes them to a public API before anything else uses them. Second, the weekly table model in Phase 3 shrinks, because it can reuse that API instead of carrying its own copies. Third, the Schedule, Generate, and Sheets groups of the transient menu can call writing-schedule.el commands and show the matching =writing-schedule.sh= line, so the Elisp side keeps the teaching property of the GUI for both packages.
+
+* The four repositories
+#+INDEX: repository family
+
+The four repositories form a square. Each tool has an Emacs Lisp and a Python port, and each tracker depends on its scheduler.
+
+#+CAPTION: The four repositories and their state on 2026-10-04.
+#+ATTR_LATEX: :booktabs t :center t
+| Repository          | Language | Version | Last commit | Tests | Uncommitted state                           |
+|---------------------+----------+---------+-------------+-------+---------------------------------------------|
+| writing-schedule    | Elisp    |   0.1.0 |  2026-07-29 |   124 | deleted images in =imgs/=, =.DS_Store=      |
+| writing-schedule-py | Python   |   0.3.1 |  2026-07-29 |    92 | version bump, three bandit reports          |
+| writing-habit       | Python   |   0.x   |  2026-10-01 |   368 | none                                        |
+| writing-habit-el    | Elisp    |   0.x   |  2026-07-23 |    57 | nine files that port the September changes  |
+
+The two schedulers are at feature parity for the GUI's needs. Both carry the same half-open overlap rule with the same midnight roll, the same section and legend regexps, the same template scaffold, and the same overlap report wording. The parity fixture =projects-and-tasks.org= (44 events, 12 codes) lives in both.
+
+* Where the two trackers stand
+#+INDEX: gap analysis
+
+The schema and the cross-port fixture database are byte-identical in the two trackers. The uncommitted edits in writing-habit-el already bring in the =:risky:= tag, the schedule-code encoder, and the portable ratio formatting.
+
+#+CAPTION: Feature parity between writing-habit and writing-habit-el.
+#+ATTR_LATEX: :booktabs t :center t
+| Capability                                    | Python | Elisp             | Action      |
+|-----------------------------------------------+--------+-------------------+-------------|
+| initdb, plan import, track import and add     | yes    | yes               | none        |
+| compare report and plot                       | yes    | yes               | none        |
+| single-week and seasons HTML dashboards       | yes    | yes               | none        |
+| context set, clear, and list                  | yes    | yes               | none        |
+| name decode, encode, and legend check         | yes    | yes (uncommitted) | Phase 0     |
+| =history= command, text series and plots      | yes    | no                | Phase 2     |
+| project-mean and category-mean series queries | yes    | no                | Phase 2     |
+| =parse-legend-cell= as a public function      | yes    | no                | Phase 2     |
+| weekly table model (Qt-free =weekly_table=)   | yes    | no                | Phase 3     |
+| table editing tools and analysis panels       | yes    | no                | Phase 4     |
+| form-driven runner for both packages          | yes    | no                | Phase 5     |
+| templates directory and =aug24.org= example   | yes    | no                | Phase 6     |
+
+* What the GUI borrows from the scheduler
+#+INDEX: scheduler dependency
+#+INDEX: public API
+
+The Python GUI imports eleven names from writing_schedule. Every one of them has an Elisp twin already, so none needs to be written again. The table shows the public name that Phase 1 should give each twin.
+
+#+CAPTION: The scheduler functions the GUI uses, their private Elisp twins, and the proposed public names.
+#+ATTR_LATEX: :booktabs t :center t
+| Python name (writing_schedule)  | Private Elisp twin                         | Proposed public name                     |
+|---------------------------------+--------------------------------------------+------------------------------------------|
+| =parser.parse_text=             | =writing-schedule--parse=                  | =writing-schedule-parse-table=           |
+| =parser.parse_time=             | =writing-schedule--parse-time=             | =writing-schedule-parse-time=            |
+| =parser.day_offset=             | =writing-schedule--day-offset=             | =writing-schedule-day-offset=            |
+| =parser.minutes_between=        | =writing-schedule--minutes=                | =writing-schedule-minutes-between=       |
+| =overlap.find_overlaps=         | =writing-schedule--overlaps=               | =writing-schedule-overlaps=              |
+| =overlap.overlap_lines=         | =writing-schedule--overlap-lines=          | =writing-schedule-overlap-lines=         |
+| =overlap.conflicting_identities= | =writing-schedule--conflicting-identities= | =writing-schedule-conflicting-identities= |
+| =template.template_string=      | =writing-schedule--template-string=        | =writing-schedule-template-string=       |
+| =week_monday=                   | =writing-schedule--week-monday=            | =writing-schedule-week-monday=           |
+| (date formatting)               | =writing-schedule--iso-date=               | =writing-schedule-iso-date=              |
+| =orgtable.split_row=            | none, because the parser uses =org-table-to-lisp= | =writing-schedule-split-row= (new)  |
+| =model.Event=                   | the event plist                            | document the plist keys                  |
+
+writing-habit-el already calls three of these private names in =writing-habit-plan.el= and declares them with =declare-function=. That works today, but it breaks the moment writing-schedule.el renames an internal, and package-lint will flag it before a MELPA submission. The MELPA protocol in the writing-schedule repository already lists header and linter fixes, so the API promotion belongs in that same release.
+
+* Guiding principle
+#+INDEX: design principle
+
+The PyQt5 interface exists because a Python program has no editor around it. The Elisp port lives inside the editor, so it should not imitate the window. Each GUI feature should map onto the Emacs idiom that already does that job.
+
+#+CAPTION: How each GUI element maps onto an Emacs idiom.
+#+ATTR_LATEX: :booktabs t :center t
+| PyQt5 element                         | Emacs counterpart                                         |
+|---------------------------------------+-----------------------------------------------------------|
+| Schedule tab grid                     | the org table in its own buffer                           |
+| cell drop-down of legend codes        | =completion-at-point= over legend codes                   |
+| cell tooltip with description and due | =eldoc= function                                          |
+| red clash tint and yellow clear tint  | overlays fed by =writing-schedule-conflicting-identities= |
+| Name, Clashes, Totals, Legend panels  | a side-window report buffer in org-mode                   |
+| Insert above and below                | commands that prompt with a suggested time range          |
+| Move up and down (Alt+Up, Alt+Down)   | =M-<up>= and =M-<down>= wrappers that report resectioning |
+| Insert and move project in legend     | the same commands acting when point is in the legend      |
+| Rename to canonical                   | a command that renames the file and visiting buffer       |
+| New from template                     | =writing-schedule-new-week-from-template=, already there  |
+| open the most recent table            | =writing-schedule-open-recent=, already there             |
+| Open in editor                        | not needed because the table is already open in Emacs     |
+| tabs of generated forms               | a transient prefix with one group per stage               |
+| Command line above the run button     | the equivalent =writing-habit= or =writing-schedule.sh= line |
+| session log dock                      | a =*writing-habit-log*= buffer                            |
+| preview dock with Open outside        | =eww= or =browse-url= for HTML, =image-mode= for PNG      |
+
+* Phase 0. Commit the work already in the trees
+#+INDEX: uncommitted changes
+
+In writing-habit-el, run =make test= and =make compile=, then commit the nine modified files as one change titled after the =:risky:= rename and the encoder. In writing-schedule, commit or restore the image deletions so the tree is clean before the API release. In writing-schedule-py, commit the 0.3.1 version bump, because writing-habit's =gui= extra already requires =writing-schedule>=0.3.1=, and move the three bandit reports out of the tree or into =.gitignore=.
+
+* Phase 1. Promote a public API in writing-schedule.el
+#+INDEX: writing-schedule.el release
+#+INDEX: obsolete aliases
+
+This phase happens in the writing-schedule repository, and it unblocks everything after it.
+
+Rename the ten functions in the table above to single-dash names. Keep each old name working through =define-obsolete-function-alias=, so any init file or script that calls the old name keeps running for one release. Write a short docstring for each that states its return shape, especially the event plist keys =:section=, =:offset=, =:start=, =:end=, and =:letter=.
+
+Add =writing-schedule-split-row=. It splits one org table line into raw cell strings without trimming, mirroring =orgtable.split_row= in the Python port. The tracker's table model needs it to rewrite one line of a file while leaving every other byte alone, which =org-table-to-lisp= cannot do because it trims the cells.
+
+Bump writing-schedule.el to 0.3.1 so both scheduler ports share a version number, and add ERT tests for the new names and for =split-row=. Then fix the package headers that the MELPA protocol lists.
+
+In writing-habit-el, replace the three =declare-function= lines in =writing-habit-plan.el= with the public names and add =(writing-schedule "0.3.1")= to =Package-Requires=.
+
+* Phase 2. Close the library gap in the tracker
+#+INDEX: history command
+#+INDEX: adherence series
+
+Add =writing-habit-compare-project-mean-series= and =writing-habit-compare-category-mean-series= beside the existing =overall-series=. Both read views that already live in schema.sql, so each function is a few lines that share the range clause of =overall-series=.
+
+Add =writing-habit-history.el=, a port of =compare/history.py=, with four public functions.
+
+- =writing-habit-history-collect= returns the week list and the five series.
+- =writing-habit-history-string= renders the same plain-text table as =render_text=, so batch output matches Python line for line.
+- =writing-habit-history-org= returns the same data as org tables for the Emacs view.
+- =writing-habit-history-write-plots= writes the five-panel plot through a generated matplotlib script, as =writing-habit-report-write-plot= already does for the weekly chart.
+
+Add =history= to =writing-habit--dispatch= with =--from=, =--to=, and =--plot=.
+
+Make =writing-habit-name-parse-legend-cell= public. Phase 3 needs it, and one rule should govern both the reader and the editor.
+
+Port =tests/test_history.py= to ERT and add a cross-port history fixture produced by the Python package from =cross-port.db=.
+
+* Phase 3. A Qt-free weekly table model
+#+INDEX: weekly table model
+#+INDEX: byte-preserving edits
+
+Port =gui/weekly_table.py= to =writing-habit-table.el=. It holds no Qt, so it ports cleanly, and it carries the editing logic that Phase 4 needs. Keep it pure. It should take the table text and return new text or line indices, so its tests need no buffer state.
+
+The model reads lines through =writing-schedule-split-row=, classifies rows with =writing-schedule-day-offset= and =writing-schedule-parse-time=, and computes clashes with =writing-schedule-overlaps=. It therefore owns only the logic that is new in the tracker.
+
+- Cell and legend edits. =set-cell=, =set-legend=, =add-legend=, =insert-legend=, =remove-legend=, =next-free-code=, and =sync-legend=, which drops only the blank rows it added itself.
+- Block edits. =suggest-times=, =insert-block=, =move-target=, =can-move=, =move-block=, and the resection rule that reports a change of activity.
+- Legend moves. =legend-move-target=, =can-move-legend=, and =move-legend=.
+- Analysis. =rows-clear-of= (it calls the scheduler's interval rule for one row against the rest), =totals= by day, project, and activity, =used-codes=, the canonical name from =writing-habit-name-encode=, and =name-matches-code=.
+
+The Python model promises that an unchanged table saves byte for byte, that each edit rewrites one line, and that a move swaps two lines. Port those three tests first, because they keep the table readable by both schedulers. Add a test that runs the model over =projects-and-tasks.org= and checks the 44 events and 12 codes, so the tracker's view of a table never drifts from the scheduler's view.
+
+* Phase 4. A minor mode for editing the weekly table
+#+INDEX: writing-habit-table-mode
+#+INDEX: overlays
+
+Build =writing-habit-table-mode=, a minor mode that turns on in an org buffer whose file name decodes as a schedule code. It is a thin layer over the Phase 3 model.
+
+- Completion. A =completion-at-point= function offers the legend codes in a day cell. Typing a new code adds a blank legend row through =sync-legend=.
+- Eldoc. Point on a cell shows the project description, the risk tag, and the due date.
+- Tints. An idle timer refreshes overlays. Cells named by =writing-schedule-conflicting-identities= get a red face. When point is in the Time column, every row that is clear of the current row gets a yellow face, and clash red wins inside a yellow row. Both faces are customizable so dark themes can override them.
+- Row commands. =writing-habit-table-insert-above= and =-insert-below= prompt for a time range prefilled with the suggestion. =M-<up>= and =M-<down>= are remapped in the grid to a move that refuses the illegal cases and messages the resection, for example "Moved the 05:45-07:15 block down into Rewriting".
+- Legend commands. The same keys move a legend entry when point is in the legend. =writing-habit-table-insert-project= prompts for the code (prefilled with =next-free-code=), the description, and the risk tag through =completing-read= over none, safe, and risky.
+- Report panel. =writing-habit-table-report= opens a side window with four org headings, Name, Clashes, Totals, and Legend. The Clashes heading uses =writing-schedule-overlap-lines=, so its wording matches the scheduler's own warning. The mode line shows the clash count.
+- File commands. =writing-habit-table-rename-to-canonical= renames the file and its buffer and refuses to overwrite another file. New tables come from =writing-schedule-new-week-from-template=, and the most recent table opens with =writing-schedule-open-recent=, so the mode adds no file-finding code of its own.
+
+Put every command on a =C-c C-w= prefix map so it does not collide with org keys.
+
+* Phase 5. A transient command center for both packages
+#+INDEX: transient
+#+INDEX: session log
+
+Transient is built into Emacs 28 and later, so it adds no dependency. Build =writing-habit-dispatch= with one group per Python GUI tab.
+
+#+CAPTION: Transient groups, the Elisp entry each suffix calls, and the shell line it logs.
+#+ATTR_LATEX: :booktabs t :center t
+| Group    | Suffix calls                                                              | Logged as                    |
+|----------+---------------------------------------------------------------------------+------------------------------|
+| Schedule | =writing-schedule-insert-template=, =writing-schedule-check-overlaps=     | =writing-schedule.sh= line   |
+| Generate | =writing-schedule-generate=, =-generate-for-day=, =-export-ics=, =-open-week= | =writing-schedule.sh= line |
+| Sheets   | =writing-schedule-timeblock-sheets=, =-timeblock-sheet-for-day=           | =writing-schedule.sh= line   |
+| Plan     | =initdb=, =plan import=                                                   | =writing-habit= line         |
+| Track    | =track import=, =track add=                                               | =writing-habit= line         |
+| Compare  | =compare=, =dashboard=                                                    | =writing-habit= line         |
+| History  | =history=                                                                 | =writing-habit= line         |
+| Context  | =context set=, =clear=, =list=                                            | =writing-habit= line         |
+| Seasons  | =seasons=, =name=                                                         | =writing-habit= line         |
+
+The tracker suffixes call =writing-habit--dispatch= with the same argument list the batch CLI gets. The scheduler suffixes call the scheduler's batch functions, and they bind scheduler options for the call instead of passing flags. The Python flag =--strict= becomes a let-binding of =writing-schedule-overlap-action= to =error=, and =--no-todo= becomes a let-binding of =writing-schedule-use-todo= to nil.
+
+Two Python scheduler options have no Elisp twin. The =--tz= option writes a VTIMEZONE through =vtimezone.py=, and =--engine reportlab= draws sheets without LaTeX. Leave both out of the menu. If the time zone matters for your calendar imports, port =vtimezone.py= into writing-schedule.el as a separate upstream task.
+
+Each infix mirrors one option. =--db= is a file infix seeded from a =writing-habit-default-db= defcustom and from transient history. =--week= and =--day= read a date with =org-read-date=. Before a suffix runs, it writes the equivalent shell command to =*writing-habit-log*=. When a suffix writes a file, the menu offers to show it. HTML opens in =eww= with a key to open it in the browser, PNG opens in =image-mode=, and org, ICS, and TeX open as text. PDF opens with =doc-view= or =pdf-tools=, which is better than the Python preview dock can do.
+
+The scheduler groups appear only when writing-schedule.el is loadable, as the Python GUI hides its scheduler tabs when writing_schedule is missing.
+
+* Phase 6. Examples, templates, docs, and packaging
+#+INDEX: documentation
+#+INDEX: MELPA
+
+Copy =templates/= and =examples/aug24.org= from writing-habit. Check first whether the scheduler's own template directory (=writing-schedule-template-directory=) should hold them instead, so the two packages do not ship two copies.
+
+Add docs pages that parallel =gui.md=. One covers =writing-habit-table-mode= with screenshots of the tints, the panel, and the insert prompts. One covers the transient menu. Update =commands.md=, =function-reference.md=, and the README.
+
+Add the new modules to =MODULES= and =TESTS= in the Makefile. Add =package-lint= and =checkdoc= targets and run both in CI. Declare =((emacs "29.1") (writing-schedule "0.3.1"))= in the main header. Point CI at a writing-schedule checkout, as the Makefile already allows with =WRITING_SCHEDULE_DIR=, so the plan-import and table-model tests run there rather than skip. Submit writing-schedule.el to MELPA first, because the tracker's recipe cannot be accepted while its dependency is missing from MELPA.
+
+* Testing target
+#+INDEX: test parity
+
+About half of the 368 Python tests exercise the Qt layer. A fair target is that every pure Python test has an ERT twin and that every command of Phases 4 and 5 has at least one test in a temp buffer under =emacs --batch=. That puts the tracker near 250 ERT tests and adds about 20 to the scheduler for the public API.
+
+* Order of work and rough size
+
+#+CAPTION: Phases in build order, with rough sizes in lines of Elisp.
+#+ATTR_LATEX: :booktabs t :center t
+| Phase | Repository       | Work                                 | New code | New tests | Depends on    |
+|-------+------------------+--------------------------------------+----------+-----------+---------------|
+|     0 | all four         | commit the pending work              |        0 |         0 | none          |
+|     1 | writing-schedule | public API, =split-row=, 0.3.1       |       80 |        20 | Phase 0       |
+|     2 | writing-habit-el | history, series, parse-legend-cell   |      250 |        25 | Phase 1       |
+|     3 | writing-habit-el | weekly table model                   |      450 |        80 | Phases 1, 2   |
+|     4 | writing-habit-el | =writing-habit-table-mode=           |      450 |        40 | Phase 3       |
+|     5 | writing-habit-el | transient dispatcher, log, preview   |      400 |        25 | Phases 1, 2   |
+|     6 | both Elisp repos | templates, docs, packaging, MELPA    |       50 |        10 | Phases 1 to 5 |
+
+The model is about 250 lines smaller than in the first revision, because the overlap, time, and row-splitting logic now comes from the scheduler. Phases 4 and 5 are independent, so either can go first. Phase 5 alone gives most of the daily value with the least code.
+
+* Open questions
+#+INDEX: open questions
+
+- Should the obsolete aliases in writing-schedule.el last one release or two?
+- Should =writing-habit-table-mode= turn on automatically by file name, or only through a hook that the writer adds?
+- Do the tracker templates belong in writing-habit-el or in the scheduler's template directory?
+- Is VTIMEZONE output worth porting to writing-schedule.el, or do floating times serve your calendar well enough?
+
+* Checklist
+
+#+BEGIN_SRC org
+- [ ] Phase 0. Commit the nine modified files in writing-habit-el after make test and make compile
+- [ ] Phase 0. Clean the writing-schedule tree and commit the 0.3.1 bump in writing-schedule-py
+- [ ] Phase 1. Promote ten writing-schedule.el functions to public names with obsolete aliases
+- [ ] Phase 1. Add writing-schedule-split-row and its tests
+- [ ] Phase 1. Bump writing-schedule.el to 0.3.1 and fix the MELPA headers
+- [ ] Phase 1. Switch writing-habit-plan.el to the public names and add the Package-Requires entry
+- [ ] Phase 2. Add project-mean and category-mean series to writing-habit-compare.el
+- [ ] Phase 2. Write writing-habit-history.el and the history subcommand
+- [ ] Phase 2. Make writing-habit-name-parse-legend-cell public
+- [ ] Phase 2. Port test_history.py and add a cross-port history fixture
+- [ ] Phase 3. Port weekly_table.py to writing-habit-table.el on top of the scheduler API
+- [ ] Phase 3. Port the byte-for-byte, one-line-edit, and two-line-swap tests first
+- [ ] Phase 3. Add the projects-and-tasks.org parity test (44 events, 12 codes)
+- [ ] Phase 4. Build writing-habit-table-mode with completion, eldoc, and overlays
+- [ ] Phase 4. Add insert, move, insert-project, move-project, report, and rename commands
+- [ ] Phase 5. Build writing-habit-dispatch with nine groups covering both packages
+- [ ] Phase 5. Log every run as its shell line and preview written files
+- [ ] Phase 6. Settle where the templates live and write the new docs pages
+- [ ] Phase 6. Add package-lint and checkdoc to CI and point CI at a writing-schedule checkout
+- [ ] Phase 6. Submit writing-schedule.el to MELPA before writing-habit-el
+#+END_SRC
