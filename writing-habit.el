@@ -22,8 +22,8 @@
 ;; one SQLite database (schema.sql) with the Python port, so either can read
 ;; what the other wrote.
 ;;
-;; This file is the aggregator.  It pulls in the five module files, adds an
-;; initdb command, gathers every command under a transient menu, and offers
+;; This file is the aggregator.  It pulls in the module files, adds an
+;; initdb command, opens the menu of writing-habit-dispatch.el, and offers
 ;; a batch entry point so the toolkit runs from a shell or a Makefile the
 ;; way the Python argparse CLI does.
 ;;
@@ -62,6 +62,7 @@
 (require 'writing-habit-seasons)
 (require 'writing-habit-history)
 (require 'writing-habit-table-auto)
+(require 'writing-habit-dispatch)
 
 (defconst writing-habit-version "0.0.0"
   "Version of the writing-habit Emacs Lisp package.")
@@ -82,27 +83,13 @@ Safe to run on an existing database."
       (writing-habit-db-close db))))
 
 
-;;;; Transient menu
+;;;; Menu
 
-;;;###autoload (autoload 'writing-habit "writing-habit" nil t)
-(transient-define-prefix writing-habit ()
-  "Menu for the writing-habit toolkit."
-  ["writing-habit"
-   ["Set up"
-    ("d" "Create a database"      writing-habit-initdb)]
-   ["Plan and track"
-    ("p" "Import a weekly plan"   writing-habit-plan-import-file)
-    ("c" "Import actuals CSV"     writing-habit-track-import-csv-file)
-    ("i" "Import actuals ICS"     writing-habit-track-import-ics-file)
-    ("k" "Harvest org clocks"     writing-habit-track-harvest-clock-file)
-    ("a" "Add a session by hand"  writing-habit-track-add-to-file)]
-   ["Review"
-    ("r" "Weekly report"          writing-habit-report-week)
-    ("D" "HTML dashboard"         writing-habit-dashboard)
-    ("h" "Adherence history"      writing-habit-history)
-    ("S" "Seasons dashboard"      writing-habit-seasons)
-    ("t" "Tag a week's context"   writing-habit-context-set-interactive)
-    ("n" "Decode a schedule code" writing-habit-name)]])
+;; The menu lives in writing-habit-dispatch.el.  M-x writing-habit opens it.
+
+;;;###autoload
+(defalias 'writing-habit #'writing-habit-dispatch
+  "Open the writing-habit menu, one group per stage of the weekly loop.")
 
 
 ;;;; Command-line dispatch
