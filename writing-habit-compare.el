@@ -135,25 +135,61 @@ Zero when no day has any recorded minutes."
           (setq rev (cdr rev)))
         streak))))
 
-(defun writing-habit-compare-overall-series (db &optional start end)
-  "Overall adherence per week from v_week_overall, oldest first.
+(defconst writing-habit-compare--project-mean-columns
+  '("week_start" "mean_adherence" "n_projects")
+  "Column order of v_week_project_mean.")
+
+(defconst writing-habit-compare--category-mean-columns
+  '("week_start" "category" "mean_adherence" "n_projects")
+  "Column order of v_week_category_mean.")
+
+(defun writing-habit-compare--series (db view columns start end
+                                         &optional clauses params)
+  "Read VIEW from DB as alists with COLUMNS, oldest week first.
 START and END, when non-nil, are any dates inside the first and last week
-to include."
-  (let ((sql "SELECT * FROM v_week_overall")
-        (clauses '())
-        (params '()))
+to include.  CLAUSES and PARAMS hold extra WHERE conditions and their
+values, in order, placed before the week range."
+  (let ((clauses (reverse clauses))
+        (params (reverse params)))
     (when start
       (push "week_start >= ?" clauses)
       (push (writing-habit-compare--monday start) params))
     (when end
       (push "week_start <= ?" clauses)
       (push (writing-habit-compare--monday end) params))
-    (when clauses
-      (setq sql (concat sql " WHERE "
-                        (mapconcat #'identity (nreverse clauses) " AND "))))
-    (setq sql (concat sql " ORDER BY week_start"))
-    (writing-habit-compare--rows db sql (nreverse params)
-                                 writing-habit-compare--overall-columns)))
+    (writing-habit-compare--rows
+     db
+     (concat "SELECT * FROM " view
+             (if clauses
+                 (concat " WHERE " (mapconcat #'identity (nreverse clauses) " AND "))
+               "")
+             " ORDER BY week_start")
+     (nreverse params)
+     columns)))
+
+(defun writing-habit-compare-overall-series (db &optional start end)
+  "Overall adherence per week from v_week_overall in DB, oldest first.
+The value is summed actual over summed planned minutes.  START and END,
+when non-nil, are any dates inside the first and last week to include."
+  (writing-habit-compare--series db "v_week_overall"
+                                 writing-habit-compare--overall-columns
+                                 start end))
+
+(defun writing-habit-compare-project-mean-series (db &optional start end)
+  "Mean of the per-project adherence ratios per week, from DB.
+Each project counts equally whatever its size.  START and END limit the
+weeks as in `writing-habit-compare-overall-series'."
+  (writing-habit-compare--series db "v_week_project_mean"
+                                 writing-habit-compare--project-mean-columns
+                                 start end))
+
+(defun writing-habit-compare-category-mean-series (db category &optional start end)
+  "Mean per-project adherence within the activity CATEGORY per week, from DB.
+CATEGORY is \"generative\", \"editing\", or \"support\".  START and END
+limit the weeks as in `writing-habit-compare-overall-series'."
+  (writing-habit-compare--series db "v_week_category_mean"
+                                 writing-habit-compare--category-mean-columns
+                                 start end '("category = ?") (list category)))
 
 
 ;;;; Grouping readers for the second dashboard (build step 3)

@@ -41,6 +41,8 @@
 ;;   emacs --batch -l writing-habit -f writing-habit-batch compare --week 2026-01-19 --db habit.db
 ;;   emacs --batch -l writing-habit -f writing-habit-batch \
 ;;         dashboard --week 2026-01-19 --out week.html --db habit.db
+;;   emacs --batch -l writing-habit -f writing-habit-batch \
+;;         history --from 2026-01-01 --to 2026-06-30 --db habit.db [--plot trend.png]
 ;;   emacs --batch -l writing-habit -f writing-habit-batch name 4gAAeAsA-gWW --table my-week.org
 ;;
 ;; Plan import additionally needs writing-schedule.el on the load-path; the
@@ -58,6 +60,7 @@
 (require 'writing-habit-dashboard)
 (require 'writing-habit-context)
 (require 'writing-habit-seasons)
+(require 'writing-habit-history)
 
 (defconst writing-habit-version "0.0.0"
   "Version of the writing-habit Emacs Lisp package.")
@@ -95,6 +98,7 @@ Safe to run on an existing database."
    ["Review"
     ("r" "Weekly report"          writing-habit-report-week)
     ("D" "HTML dashboard"         writing-habit-dashboard)
+    ("h" "Adherence history"      writing-habit-history)
     ("S" "Seasons dashboard"      writing-habit-seasons)
     ("t" "Tag a week's context"   writing-habit-context-set-interactive)
     ("n" "Decode a schedule code" writing-habit-name)]])
@@ -208,6 +212,18 @@ entry point, factored out so it can be tested directly."
              (progn (writing-habit-dashboard-write db week out)
                     (format "Wrote dashboard to %s" out))
            (writing-habit-db-close db))))
+      ("history"
+       (let ((start (writing-habit--opt opts "from"))
+             (end (writing-habit--opt opts "to"))
+             (plot (writing-habit--opt opts "plot"))
+             (db (writing-habit-db-connect (writing-habit--req opts "db"))))
+         (unwind-protect
+             (let ((out (writing-habit-history-string db start end)))
+               (if plot
+                   (progn (writing-habit-history-write-plots db plot start end)
+                          (concat out (format "\n\nWrote plots to %s" plot)))
+                 out))
+           (writing-habit-db-close db))))
       ("seasons"
        (let ((out (writing-habit--req opts "out"))
              (db (writing-habit-db-connect (writing-habit--req opts "db"))))
@@ -239,8 +255,9 @@ entry point, factored out so it can be tested directly."
                  "\n"))
                (_ (error "Usage: context set|clear|list ...")))
            (writing-habit-db-close db))))
-      (_ (error "Unknown command %S; use initdb, plan, track, compare, dashboard, seasons, context, or name"
-                (or cmd ""))))))
+      (_ (error (concat "Unknown command %S; use initdb, plan, track, compare, "
+                      "dashboard, history, seasons, context, or name")
+               (or cmd ""))))))
 
 ;;;###autoload
 (defun writing-habit-batch ()

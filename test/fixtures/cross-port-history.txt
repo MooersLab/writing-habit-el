@@ -1,0 +1,7 @@
+Weekly adherence history
+========================================================================
+week          overall  proj-mean     gen    edit  support
+------------------------------------------------------------------------
+2026-01-19       0.26       0.17    0.25    0.11     0.27
+
+overall is summed actual over summed planned. The other columns are the mean of the per-project adherence ratios. A value of 1.00 is on plan.

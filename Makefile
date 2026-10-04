@@ -21,6 +21,7 @@ MODULES = writing-habit-db.el \
           writing-habit-dashboard.el \
           writing-habit-context.el \
           writing-habit-seasons.el \
+          writing-habit-history.el \
           writing-habit.el
 
 TESTS = test/writing-habit-name-tests.el \
@@ -30,7 +31,8 @@ TESTS = test/writing-habit-name-tests.el \
         test/writing-habit-compare-tests.el \
         test/writing-habit-dashboard-tests.el \
         test/writing-habit-main-tests.el \
-        test/writing-habit-seasons-tests.el
+        test/writing-habit-seasons-tests.el \
+        test/writing-habit-history-tests.el
 
 LOADPATH = -L . $(if $(WRITING_SCHEDULE_DIR),-L $(WRITING_SCHEDULE_DIR),)
 TESTLOAD = $(foreach t,$(TESTS),-l $(t))

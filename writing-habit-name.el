@@ -233,13 +233,38 @@ every canonical code."
 
 ;;;; Legend reading and checking
 
+(defun writing-habit-name-parse-legend-cell (cell)
+  "Return (CODE DESCRIPTION RISK) for the legend CELL, or nil.
+A legend row carries the code and the description in its first cell, for
+example \"A: DNPH1 docking :safe:\".  A trailing risk tag in either the
+:safe: or the (safe) form is stripped from the description.  Two tags
+name a class, safe and risky, and risky names the class the database
+calls speculative, so RISK is \"safe\", \"speculative\", or nil.  A legacy
+support tag is stripped and names nothing, because support is an
+activity.  Callers that hold a table in memory, such as the table editor,
+use this so one rule governs both the reader and the editor."
+  (let ((cell (string-trim cell)))
+    (when (let ((case-fold-search nil))
+            (string-match writing-habit-name--legend-re cell))
+      (let ((code (match-string 1 cell))
+            (desc (string-trim (match-string 2 cell)))
+            (risk nil))
+        (let ((case-fold-search t))
+          (when (string-match writing-habit-name--risk-re desc)
+            (let ((tag (downcase (or (match-string 1 desc) (match-string 2 desc)))))
+              (setq risk (cdr (assoc tag writing-habit-name-tag-to-risk))))
+            (setq desc (string-trim
+                        (replace-regexp-in-string writing-habit-name--risk-re "" desc)))))
+        (list code desc risk)))))
+
 (defun writing-habit-name-read-legend (table-path)
   "Return the legend of the weekly org table at TABLE-PATH.
-The result is an alist of (CODE . (DESCRIPTION RISK)).  RISK is a
-lowercase string, one of \"safe\" or \"speculative\", or nil.  Support is an
-activity category, not a risk class, so a legacy support tag records no risk.
-A legend row carries the code and description in its first cell, for
-example |A: DNPH1 docking :safe:|.  A trailing risk tag is stripped."
+The result is an alist of (CODE . (DESCRIPTION RISK)) in table order,
+where RISK is \"safe\", \"speculative\", or nil, as parsed by
+`writing-habit-name-parse-legend-cell'.  A code defined twice keeps its
+first definition, which is what the plan importer sees, because the
+scheduler looks a code up with `assoc'.  This matches `read_legend' in
+the Python package."
   (let ((legend '()))
     (with-temp-buffer
       (insert-file-contents table-path)
@@ -250,27 +275,13 @@ example |A: DNPH1 docking :safe:|.  A trailing risk tag is stripped."
                    (line-beginning-position) (line-end-position)))))
           (when (and (string-prefix-p "|" s)
                      (not (string-match-p "\\`[|+ -]*\\'" s)))
-            (let ((first (car (split-string s "[|]" t "[ \t]*"))))
-              (when (and first
-                         (let ((case-fold-search nil))
-                           (string-match writing-habit-name--legend-re first)))
-                (let ((code (match-string 1 first))
-                      (desc (string-trim (match-string 2 first)))
-                      (risk nil))
-                  (let ((case-fold-search t))
-                    (when (string-match writing-habit-name--risk-re desc)
-                      (let ((tag (downcase (or (match-string 1 desc)
-                                               (match-string 2 desc)))))
-                        ;; Only safe and risky name a class; a legacy support
-                        ;; tag is stripped but records no risk.
-                        (setq risk (cdr (assoc tag writing-habit-name-tag-to-risk))))
-                      (setq desc (string-trim
-                                  (replace-regexp-in-string
-                                   writing-habit-name--risk-re "" desc)))))
-                  (setq legend (assoc-delete-all code legend))
-                  (setq legend (append legend (list (cons code (list desc risk))))))))))
+            (let* ((inner (string-trim s "|+" "|+"))
+                   (parsed (writing-habit-name-parse-legend-cell
+                            (car (split-string inner "|")))))
+              (when (and parsed (not (assoc (car parsed) legend)))
+                (push (cons (car parsed) (cdr parsed)) legend)))))
         (forward-line 1)))
-    legend))
+    (nreverse legend)))
 
 (defun writing-habit-name-check-against-legend (decoded legend)
   "Match every project letter in DECODED to an entry in LEGEND.
