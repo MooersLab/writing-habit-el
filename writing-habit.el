@@ -61,6 +61,7 @@
 (require 'writing-habit-context)
 (require 'writing-habit-seasons)
 (require 'writing-habit-history)
+(require 'writing-habit-table-auto)
 
 (defconst writing-habit-version "0.0.0"
   "Version of the writing-habit Emacs Lisp package.")
