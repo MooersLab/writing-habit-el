@@ -32,7 +32,9 @@ jobs:
           emacs -Q --batch --eval "(princ (format \"sqlite-available-p: %s\n\" (and (fboundp 'sqlite-available-p) (sqlite-available-p))))"
 
       - name: Fetch writing-schedule 0.3.1 or newer (plan import, table model, table mode)
-        run: git clone --depth 1 https://github.com/MooersLab/writing-schedule.git ../writing-schedule
+        run: |
+          git clone --depth 1 https://github.com/MooersLab/writing-schedule.git ../writing-schedule
+          grep -m1 '^;; Version' ../writing-schedule/writing-schedule.el
 
       - name: Byte-compile, treating warnings as errors
         run: make compile WRITING_SCHEDULE_DIR=../writing-schedule

@@ -54,6 +54,11 @@
 (require 'seq)
 (require 'subr-x)
 (require 'writing-schedule)
+
+(eval-and-compile
+  (unless (fboundp 'writing-schedule-split-row)
+    (error "writing-habit-table needs writing-schedule 0.3.1 or newer, %s"
+           "but the writing-schedule.el on the load path is older")))
 (require 'writing-habit-name)
 (require 'writing-habit-plan)
 

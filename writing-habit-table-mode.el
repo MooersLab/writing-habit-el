@@ -102,6 +102,15 @@ Set it before the mode first loads."
 
 ;;;; Mapping between the buffer and the model
 
+(defun writing-habit-table--replace-contents (source)
+  "Replace the accessible text of the current buffer with that of SOURCE.
+Only the text that differs is changed, so point, marks, and undo behave
+as after a hand edit.  Emacs 31 renamed the function that does this."
+  (if (>= emacs-major-version 31)
+      (replace-region-contents (point-min) (point-max) source)
+    (with-suppressed-warnings ((obsolete replace-buffer-contents))
+      (replace-buffer-contents source))))
+
 (defun writing-habit-table-current ()
   "Return the model of the weekly table in the current buffer."
   (let ((model (writing-habit-table-from-text
@@ -152,7 +161,7 @@ Set it before the mode first loads."
     (unwind-protect
         (progn
           (with-current-buffer source (insert text))
-          (replace-buffer-contents source))
+          (writing-habit-table--replace-contents source))
       (kill-buffer source))
     (setq writing-habit-table--synced (writing-habit-table-synced-codes model))
     (writing-habit-table--refresh t)))
