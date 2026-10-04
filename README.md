@@ -22,11 +22,11 @@ Because the schema is the contract, the database this package writes is byte-for
 
 The weekly HTML dashboard, with a light and a dark theme:
 
-![Dashboard](imgs/dashboard-light.png)
+![Dashboard](assets/images/dashboard-light.png)
 
 The optional planned-versus-actual chart from the compare stage:
 
-![Planned versus actual](imgs/plot.png)
+![Planned versus actual](assets/images/plot.png)
 
 ## Why an Emacs version
 
