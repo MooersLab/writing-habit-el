@@ -31,12 +31,14 @@ jobs:
         run: |
           emacs -Q --batch --eval "(princ (format \"sqlite-available-p: %s\n\" (and (fboundp 'sqlite-available-p) (sqlite-available-p))))"
 
-      - name: Fetch writing-schedule (optional, enables the plan-import tests)
-        continue-on-error: true
+      - name: Fetch writing-schedule 0.3.1 or newer (plan import, table model, table mode)
         run: git clone --depth 1 https://github.com/MooersLab/writing-schedule.git ../writing-schedule
 
       - name: Byte-compile, treating warnings as errors
-        run: make compile
+        run: make compile WRITING_SCHEDULE_DIR=../writing-schedule
+
+      - name: Check docstrings
+        run: make checkdoc WRITING_SCHEDULE_DIR=../writing-schedule
 
       - name: Run the test suite
         run: |

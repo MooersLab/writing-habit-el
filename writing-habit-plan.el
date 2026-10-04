@@ -121,7 +121,7 @@ my-week.org yields my-week."
       stem)))
 
 (defun writing-habit-plan-require-schedule ()
-  "Load writing-schedule.el and check that it offers the 0.3.1 public API.
+  "Load writing-schedule.el and check for its 0.3.1 public API.
 Signal an error naming the fix when it is missing or too old."
   (unless (require 'writing-schedule nil t)
     (error "This command needs writing-schedule.el 0.3.1 or later on the load-path"))

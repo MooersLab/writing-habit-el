@@ -88,35 +88,35 @@ This matches the week_start generated column in the schema."
           (sqlite-select db sql params)))
 
 (defun writing-habit-compare-week-project (db week)
-  "Planned versus actual minutes and adherence per project for WEEK."
+  "Planned versus actual minutes and adherence per project in DB for WEEK."
   (writing-habit-compare--rows
    db "SELECT * FROM v_week_project WHERE week_start = ? ORDER BY code"
    (list (writing-habit-compare--monday week))
    writing-habit-compare--project-columns))
 
 (defun writing-habit-compare-week-category (db week)
-  "Planned versus actual minutes per activity for WEEK."
+  "Planned versus actual minutes per activity in DB for WEEK."
   (writing-habit-compare--rows
    db "SELECT * FROM v_week_category WHERE week_start = ?"
    (list (writing-habit-compare--monday week))
    writing-habit-compare--category-columns))
 
 (defun writing-habit-compare-week-barbell (db week)
-  "Planned versus actual minutes per risk class for WEEK."
+  "Planned versus actual minutes per risk class in DB for WEEK."
   (writing-habit-compare--rows
    db "SELECT * FROM v_week_barbell WHERE week_start = ? ORDER BY risk_class"
    (list (writing-habit-compare--monday week))
    writing-habit-compare--barbell-columns))
 
 (defun writing-habit-compare-day-actual (db week)
-  "Actual minutes and worked flag per day for WEEK."
+  "Actual minutes and worked flag per day in DB for WEEK."
   (writing-habit-compare--rows
    db "SELECT * FROM v_day_actual WHERE week_start = ? ORDER BY day"
    (list (writing-habit-compare--monday week))
    writing-habit-compare--day-columns))
 
 (defun writing-habit-compare-current-streak (db)
-  "Return the length of the run of consecutive worked days ending at the latest.
+  "Return the run of consecutive worked days in DB ending at the latest.
 Zero when no day has any recorded minutes."
   (let* ((rows (sqlite-select
                 db "SELECT day FROM v_day_actual WHERE worked = 1 ORDER BY day"))

@@ -14,7 +14,8 @@ make test
 ```
 
 The suite has a test file per module, namely name, db, plan, track, compare,
-dashboard, and a main test for the batch dispatch. The tests that need SQLite
+dashboard, seasons, history, table, table mode, and dispatch, and a main test
+for the batch dispatch. The tests that need SQLite
 skip themselves when Emacs was built without it, and the plan-import tests skip
 themselves when `writing-schedule.el` is not on the load path, so a partial
 environment still gives a green run over the parts it can reach. Point
@@ -35,6 +36,18 @@ package stay aligned to one fixed rendering rather than to each other. When you
 change the dashboard markup, regenerate the fixture in both repositories in the
 same commit, because a one-byte drift fails both suites.
 
+## The table-model parity check
+
+`test/parity/run.sh` reads every shipped template and example table with both
+the Elisp model in `writing-habit-table.el` and the Python model in
+`gui/weekly_table.py`, edits each table in every supported way, and diffs the
+two summaries line for line. It needs checkouts of `writing-schedule`, the
+Python `writing-habit`, and `writing-schedule-py`:
+
+```sh
+make parity WRITING_SCHEDULE_DIR=../writing-schedule PY_DIR=../writing-habit WSPY_DIR=../writing-schedule-py
+```
+
 ## The byte-compile
 
 ```sh
@@ -43,8 +56,8 @@ make compile
 
 This byte-compiles every module with `byte-compile-error-on-warn` set, so a
 clean compile is part of the bar for any change. Keep docstring lines within 80
-characters, because the compiler flags longer ones. Run `M-x checkdoc` on a file
-you touch, and run `package-lint` on the changed files before you open a pull
+characters, because the compiler flags longer ones. Run `make checkdoc` and, after
+installing `package-lint` from MELPA, `make lint` before you open a pull
 request. Continuous integration runs the same `make compile` and `make test`
 across several Emacs versions on every pull request.
 

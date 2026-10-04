@@ -36,6 +36,8 @@ data-model
 tracking-formats
 schedule-codes
 commands
+menu
+table-mode
 dashboard
 ```
 

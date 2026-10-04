@@ -105,12 +105,74 @@ Renders the self-contained HTML dashboard, the twin of the Python
 | `writing-habit-dashboard-write` | function | Render the dashboard and write it to a path. |
 | `writing-habit-dashboard-html` | function | Return the dashboard HTML as a string. |
 
+## writing-habit-history
+
+Ports `compare/history.py`.
+
+| Symbol | Kind | What it does |
+|--------|------|--------------|
+| `writing-habit-history` | command | Show the history of a database as an org buffer. |
+| `writing-habit-history-collect` | function | Return the weeks and the five adherence series. |
+| `writing-habit-history-string` | function | Return the plain-text table, identical to Python. |
+| `writing-habit-history-org` | function | Return the history as an org table. |
+| `writing-habit-history-write-plots` | function | Write the five-panel plot with matplotlib. |
+| `writing-habit-compare-project-mean-series` | function | Mean per-project adherence per week. |
+| `writing-habit-compare-category-mean-series` | function | The same mean within one activity. |
+
+## writing-habit-table
+
+Ports `gui/weekly_table.py`. Row indexes are zero-based and count every table
+line, rules included.
+
+| Symbol | Kind | What it does |
+|--------|------|--------------|
+| `writing-habit-table-from-text`, `-from-file` | function | Parse a table document. |
+| `writing-habit-table-to-text`, `-save` | function | Write it back, byte for byte when untouched. |
+| `writing-habit-table-set-cell`, `-set-legend` | function | Rewrite one line. |
+| `writing-habit-table-suggest-times`, `-insert-block` | function | Insert an empty block beside a row. |
+| `writing-habit-table-move-block`, `-can-move` | function | Move a block, joining a new section when it passes a header. |
+| `writing-habit-table-insert-legend`, `-move-legend` | function | Insert or move a project in the legend. |
+| `writing-habit-table-sync-legend` | function | Give every grid code a legend row. |
+| `writing-habit-table-rows-clear-of` | function | The blocks whose range does not overlap a row. |
+| `writing-habit-table-overlaps`, `-conflicting-cells` | function | Clashes by the scheduler's rule. |
+| `writing-habit-table-totals` | function | Planned minutes by day, project, and activity. |
+| `writing-habit-table-code-or-problem` | function | The canonical schedule code, or why there is none. |
+| `writing-habit-table-rename-to-canonical` | function | Rename the file to its canonical code. |
+| `writing-habit-table-split-due-date`, `-project-info` | function | Read a due date and describe a code. |
+
+## writing-habit-table-mode
+
+| Symbol | Kind | What it does |
+|--------|------|--------------|
+| `writing-habit-table-mode` | minor mode | Tints, completion, eldoc, and the table commands. |
+| `writing-habit-table-mode-maybe` | function | Turn the mode on in a schedule-code file, from `org-mode-hook`. |
+| `writing-habit-table-menu` | command | The table menu. |
+| `writing-habit-table-report` | command | The name, clashes, totals, and legend in a side window. |
+
+The other commands are listed in {doc}`table-mode`.
+
+## writing-habit-dispatch
+
+| Symbol | Kind | What it does |
+|--------|------|--------------|
+| `writing-habit-dispatch` | command | The top menu, also run by `writing-habit`. |
+| `writing-habit-dispatch-plan` and its siblings | command | One form per stage. |
+| `writing-habit-dispatch-run-habit` | function | Run a tracker command, log it, and preview its files. |
+| `writing-habit-dispatch-run-schedule` | function | Run a scheduler call and log it as a `writing-schedule.sh` line. |
+| `writing-habit-dispatch-preview` | command | Show a file the way its kind deserves. |
+| `writing-habit-dispatch-show-log` | command | Show the log. |
+
 ## Configuration
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `writing-habit-db-schema-file` | `schema.sql` beside the package | Path to the shared schema. |
-| `writing-habit-report-python` | `"python3"` | Interpreter for the optional plot. |
+| `writing-habit-report-python` | `"python3"` | Interpreter for the optional plots. |
+| `writing-habit-default-db` | nil | Database that seeds the forms of the menu. |
+| `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes. |
+| `writing-habit-table-mode-auto` | t | Turn on the table mode in schedule-code files. |
+| `writing-habit-table-mode-prefix` | `"C-c C-;"` | Key of the table menu. |
+| `writing-habit-table-idle-delay` | 0.25 | Seconds of idle time before the tints refresh. |
 
 Set them through `M-x customize-group RET writing-habit RET` or in your init
 file.

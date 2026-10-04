@@ -59,7 +59,7 @@
 (defun writing-habit-report--table (header rows)
   "Return an org table string for HEADER and ROWS, each a list of strings.
 Columns are padded so the table reads well as plain text and re-aligns in
-org-mode."
+Org mode."
   (let* ((ncol (length header))
          (widths (make-vector ncol 0)))
     (dolist (r (cons header rows))

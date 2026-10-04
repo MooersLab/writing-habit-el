@@ -367,6 +367,7 @@ the icalendar library bundled with Emacs, so it needs no extra package."
 ;;;###autoload
 (defun writing-habit-track-add-to-file (db-file day project minutes category note)
   "Add one session to the database at DB-FILE and report its id.
+DAY is the ISO date, PROJECT the code, and NOTE an optional remark.
 Interactively, prompt for each field.  MINUTES is the whole minutes
 worked; CATEGORY is one of the three activities or empty."
   (interactive

@@ -44,7 +44,7 @@ TESTS = test/writing-habit-name-tests.el \
 LOADPATH = -L . $(if $(WRITING_SCHEDULE_DIR),-L $(WRITING_SCHEDULE_DIR),)
 TESTLOAD = $(foreach t,$(TESTS),-l $(t))
 
-.PHONY: test compile clean
+.PHONY: test compile clean checkdoc lint parity
 
 test:
 	$(EMACS) -Q -batch $(LOADPATH) -l ert $(TESTLOAD) \
@@ -54,6 +54,25 @@ compile:
 	$(EMACS) -Q -batch $(LOADPATH) \
 	  --eval "(setq byte-compile-error-on-warn t)" \
 	  -f batch-byte-compile $(MODULES)
+
+checkdoc:
+	$(EMACS) -Q -batch $(LOADPATH) \
+	  --eval "(require 'checkdoc)" \
+	  --eval "(setq checkdoc-diagnostic-buffer \"*warn*\")" \
+	  --eval "(dolist (f (list $(foreach m,$(MODULES),\"$(m)\"))) (checkdoc-file f))"
+
+# package-lint comes from MELPA; install it once with M-x package-install.
+lint:
+	$(EMACS) -Q -batch $(LOADPATH) \
+	  --eval "(progn (require 'package) (package-initialize) (require 'package-lint))" \
+	  --eval "(setq package-lint-main-file \"writing-habit.el\")" \
+	  -f package-lint-batch-and-exit $(MODULES)
+
+# Compare the table model with the Python one over every shipped table.
+PY_DIR ?= ../writing-habit
+WSPY_DIR ?= ../writing-schedule-py
+parity:
+	test/parity/run.sh $(WRITING_SCHEDULE_DIR) $(PY_DIR) $(WSPY_DIR)
 
 clean:
 	rm -f *.elc test/*.elc

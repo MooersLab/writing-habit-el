@@ -41,13 +41,15 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 - An optional planned-versus-actual bar chart, embedded in the report as an Org Babel python block or written directly to a PNG for batch use.
 - A self-contained HTML dashboard with two panels: the week's planned schedule as a time-by-day grid colored by activity, and the planned-versus-actual comparison as tiles, per-project meters, the activity balance, and the barbell split. It carries a light and a dark theme and needs no server.
 - A schedule-code decoder that reads a compact file name such as `4gAAeAsA-gWW.org` and checks its project letters against a table legend.
-- Every stage is an interactive command, gathered under one transient menu, and every stage is also a batch subcommand, so the toolkit runs from a shell or a Makefile the same way the Python command-line interface does.
+- A cross-week history of adherence, as a text table identical to the Python output, as an org table, and as a five-panel plot.
+- A minor mode for editing the weekly table, with clash and free-time tints, code completion, and commands that insert and move blocks and projects while keeping the file intact.
+- Every stage is an interactive command, gathered under one menu that also runs the `writing-schedule.el` commands, and every stage is also a batch subcommand, so the toolkit runs from a shell or a Makefile the same way the Python command-line interface does.
 
 ## Requirements
 
 - GNU Emacs 29.1 or newer, built with SQLite support. The package checks `sqlite-available-p` and reports a clear message when SQLite is missing.
 - `transient` 0.4 or newer, which ships with Emacs 28 and later.
-- Optional: `writing-schedule.el` on the load path, needed only for `plan import`, and loaded lazily, so every other command runs without it.
+- `writing-schedule.el` 0.3.1 or newer, for `plan import`, the table editing mode, and the scheduler groups of the menu. The tracker commands load it lazily, so they still run without it.
 - Optional: `python3` with `matplotlib`, needed only for the comparison plot. The HTML dashboard is pure Emacs Lisp and needs no Python.
 
 ## Installation
@@ -96,33 +98,27 @@ Open the menu with `M-x writing-habit` and work down it, or run the commands dir
 3. Record actual sessions. Use `M-x writing-habit-track-add-to-file` for a quick end-of-day entry, `writing-habit-track-import-csv-file` for the tracking CSV, `writing-habit-track-import-ics-file` for a calendar, or `writing-habit-track-harvest-clock-file` to pull in completed org-clock entries.
 4. Review the week. `M-x writing-habit-report-week` opens the comparison as an org buffer, and `M-x writing-habit-dashboard` writes the HTML dashboard and opens it in a browser.
 
-## The transient menu
+## The command menu
 
-`M-x writing-habit` opens a menu that gathers every command:
+`M-x writing-habit` opens a menu with one group per stage of the weekly loop, the same groups as the tabs of the Python package's graphical interface. Each group opens a form whose options mirror the command line, seeded with the database you used last and with today's week. Every run is logged as the equivalent `writing-habit` or `writing-schedule.sh` line, and a file that a command writes is shown at once. See `docs/menu.md`.
 
 ```
-writing-habit
-  Set up
-    d  Create a database
-  Plan and track
-    p  Import a weekly plan
-    c  Import actual CSV
-    i  Import actual ICS
-    k  Harvest org clocks
-    a  Add a session by hand
-  Review
-    r  Weekly report
-    D  HTML dashboard
-    S  Seasons dashboard
-    t  Tag a week's context
-    n  Decode a schedule code
+writing-habit   database: ~/habit.db
+  Scheduler        Tracker          Across weeks          Session
+  s  Schedule      p  Plan          h  History            l  Show the log
+  g  Generate      t  Track         x  Context
+  S  Sheets        c  Compare       n  Seasons and names
 ```
+
+## Editing the weekly table
+
+An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. Clash cells turn red, and with point in the Time column of a block, every block whose range does not overlap it turns yellow. Completion in a day cell offers the legend codes, and the echo area names the project, due date, and risk of the code at point. `M-<up>` and `M-<down>` move a block or a legend entry, and `C-c C-;` opens a menu that inserts blocks with a suggested time range, inserts projects with the next free code, renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
 
 ## Command reference
 
 | Command | What it does |
 |---|---|
-| `writing-habit` | Open the transient menu |
+| `writing-habit` | Open the command menu |
 | `writing-habit-initdb` | Create the schema and seed the activities in a database |
 | `writing-habit-plan-import-file` | Load a weekly `writing-schedule` table for a week |
 | `writing-habit-track-add-to-file` | Add one session by hand |
@@ -132,8 +128,11 @@ writing-habit
 | `writing-habit-report-week` | Show the weekly comparison as an org buffer |
 | `writing-habit-dashboard` | Write and open the HTML dashboard |
 | `writing-habit-seasons` | Write and open the seasons dashboard, grouped by month, context, and schedule |
+| `writing-habit-history` | Show the weekly adherence history as an org buffer |
 | `writing-habit-context-set-interactive` | Tag a week with an event context |
 | `writing-habit-name` | Decode a schedule code and check it against a legend |
+| `writing-habit-table-mode` | Edit a weekly table with live checks |
+| `writing-habit-dispatch-preview` | Show a written file the way its kind deserves |
 
 ## Batch use from a shell
 
@@ -156,6 +155,8 @@ emacs --batch -l writing-habit -f writing-habit-batch \
       dashboard --week 2026-01-19 --out week.html --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch \
       context set --week 2026-02-02 --tag teaching --db habit.db
+emacs --batch -l writing-habit -f writing-habit-batch \
+      history --from 2026-01-01 --to 2026-06-30 --plot trend.png --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch seasons --out seasons.html --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch name 4gAAeAsA-gWW --table my-week.org
 ```
@@ -209,7 +210,11 @@ Because Emacs runs only the first statement of a multi-statement string through 
 | Variable | Default | Meaning |
 |---|---|---|
 | `writing-habit-db-schema-file` | `schema.sql` beside the package | Path to the shared schema |
-| `writing-habit-report-python` | `"python3"` | Interpreter for the optional plot |
+| `writing-habit-report-python` | `"python3"` | Interpreter for the optional plots |
+| `writing-habit-default-db` | nil | Database that seeds the forms of the menu |
+| `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes |
+| `writing-habit-table-mode-auto` | t | Turn on the table mode in schedule-code files |
+| `writing-habit-table-mode-prefix` | `"C-c C-;"` | Key of the table menu |
 
 Set them through `M-x customize-group RET writing-habit RET` or in your init file.
 
@@ -226,7 +231,12 @@ The package is split into focused files, all loaded by the `writing-habit.el` ag
 | `writing-habit-compare.el` | Run the four views and the streak |
 | `writing-habit-report.el` | Render the org report and the optional plot |
 | `writing-habit-dashboard.el` | Render the HTML dashboard |
-| `writing-habit.el` | Interactive commands, transient menu, batch entry point |
+| `writing-habit-history.el` | Cross-week adherence history |
+| `writing-habit-table.el` | The weekly table as an editable document, with no buffer |
+| `writing-habit-table-auto.el` | Turn on the table mode by file name |
+| `writing-habit-table-mode.el` | The minor mode for editing the weekly table |
+| `writing-habit-dispatch.el` | The command menu, its log, and the previews |
+| `writing-habit.el` | Interactive commands and the batch entry point |
 
 The tests use ERT. Run them and a warnings-as-errors byte-compile from the repository root:
 
@@ -241,7 +251,13 @@ The plan-import tests need `writing-schedule.el`. Point `WRITING_SCHEDULE_DIR` a
 make test WRITING_SCHEDULE_DIR=/path/to/writing-schedule
 ```
 
-A committed fixture, a database built by the Python port, is read back through this package in one test, so the two ports stay in step.
+A committed fixture, a database built by the Python port, is read back through this package in one test, so the two ports stay in step. The history text is compared with the Python output byte for byte, and `test/parity/run.sh` compares the table model with the Python one over every shipped table.
+
+```sh
+make parity WRITING_SCHEDULE_DIR=../writing-schedule PY_DIR=../writing-habit WSPY_DIR=../writing-schedule-py
+make checkdoc
+make lint
+```
 
 ## Relationship to the other packages
 

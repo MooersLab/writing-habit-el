@@ -1,30 +1,14 @@
 # Commands and the batch interface
 
-Every stage is an interactive command, gathered under one transient menu, and
+Every stage is an interactive command, gathered under one menu, and
 every stage is also a batch subcommand, so the toolkit runs from a shell or a
 Makefile the same way the Python command-line interface does.
 
-## The transient menu
+## The command menu
 
-`M-x writing-habit` opens a menu that gathers every command under three groups:
-
-```
-writing-habit
-  Set up
-    d  Create a database
-  Plan and track
-    p  Import a weekly plan
-    c  Import actuals CSV
-    i  Import actuals ICS
-    k  Harvest org clocks
-    a  Add a session by hand
-  Review
-    r  Weekly report
-    D  HTML dashboard
-    S  Seasons dashboard
-    t  Tag a week's context
-    n  Decode a schedule code
-```
+`M-x writing-habit` opens the command menu, with one group per stage of the
+weekly loop. Each group opens a form whose options mirror the command line, and
+every run is logged as the equivalent shell line. See {doc}`menu`.
 
 ## Interactive commands
 
@@ -34,7 +18,7 @@ so you can keep more than one.
 
 | Command | What it does |
 |---------|--------------|
-| `writing-habit` | Open the transient menu. |
+| `writing-habit` | Open the command menu. |
 | `writing-habit-initdb` | Create the schema and seed the activities in a database. |
 | `writing-habit-plan-import-file` | Load a weekly `writing-schedule` table for a week. Needs `writing-schedule.el`. |
 | `writing-habit-track-add-to-file` | Add one session by hand. |
@@ -44,6 +28,7 @@ so you can keep more than one.
 | `writing-habit-report-week` | Show the weekly comparison as an org buffer. |
 | `writing-habit-dashboard` | Write and open the HTML dashboard. |
 | `writing-habit-seasons` | Write and open the seasons dashboard, grouped by month, context, and schedule. |
+| `writing-habit-history` | Show the weekly adherence history as an org buffer. |
 | `writing-habit-context-set-interactive` | Tag a week with an event context. |
 | `writing-habit-name` | Decode a schedule code and check it against a legend. |
 
@@ -66,6 +51,7 @@ emacs --batch -l writing-habit -f writing-habit-batch \
       track add --day DATE --project CODE [--minutes N] [--category C] [--start HH:MM] [--end HH:MM] [--note TEXT] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch compare --week DATE [--plot FILE] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch dashboard --week DATE --out FILE --db DB
+emacs --batch -l writing-habit -f writing-habit-batch history [--from DATE] [--to DATE] [--plot FILE] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch seasons --out FILE --db DB
 emacs --batch -l writing-habit -f writing-habit-batch context set|clear|list [--week DATE] [--tag TAG] [--note TEXT] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch name CODE [--table TABLE]
@@ -96,6 +82,13 @@ also writes a bar chart, which needs `python3` with `matplotlib`.
 
 `dashboard` renders the self-contained HTML dashboard for the week and writes it
 to `--out`.
+
+`history` prints one row per week with the overall adherence, which is summed
+actual over summed planned minutes, the mean of the per-project ratios, and that
+mean within each activity. `--from` and `--to` take any date inside the first
+and last week. With `--plot` it also writes five plots that share the week axis,
+which needs `python3` with `matplotlib`. The text is identical to the output of
+the Python command.
 
 `seasons` writes the second HTML dashboard, which groups adherence by calendar
 month, by event-context tag, and by the schedule file-name code. The schedule
