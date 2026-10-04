@@ -6,6 +6,24 @@
 #+LaTeX_HEADER: \usepackage{booktabs}
 #+LaTeX_HEADER: \usepackage{minted}
 
+* Status on 2026-10-04
+#+INDEX: status
+
+All seven phases are done and committed locally in writing-habit-el and writing-schedule.  Nothing has been pushed.  The decisions taken were these.
+
+- The old private names in writing-schedule.el keep working for two releases.  They are obsolete aliases as of 0.3.1, with removal planned for 0.5.0.
+- The table editing mode turns on by itself in any org file whose name is a schedule code and that holds a weekly table.
+- The templates live in the scheduler.  They ship in writing-schedule's =templates/= directory, and the template commands offer them after your own.
+
+#+CAPTION: Test counts after the level-up.
+#+ATTR_LATEX: :booktabs t :center t
+| Repository       | Before | After | Notes                                                    |
+|------------------+--------+-------+----------------------------------------------------------|
+| writing-habit-el |     57 |   143 | plus 2580 parity probes against the Python table model   |
+| writing-schedule |    124 |   131 | public API, aliases, split-row, and bundled templates    |
+
+Two items remain open.  First, the scheduler's working tables are named =table-YYYY-MM-DD.org=, which is not a schedule code, so the table mode does not turn on for them and plan import records that name as the schedule code.  Second, a few legacy docstrings still draw checkdoc warnings, which =make checkdoc= lists.
+
 * Revision note
 #+INDEX: revision history
 
@@ -231,32 +249,29 @@ The model is about 250 lines smaller than in the first revision, because the ove
 * Open questions
 #+INDEX: open questions
 
-- Should the obsolete aliases in writing-schedule.el last one release or two?
-- Should =writing-habit-table-mode= turn on automatically by file name, or only through a hook that the writer adds?
-- Do the tracker templates belong in writing-habit-el or in the scheduler's template directory?
 - Is VTIMEZONE output worth porting to writing-schedule.el, or do floating times serve your calendar well enough?
 
 * Checklist
 
 #+BEGIN_SRC org
-- [ ] Phase 0. Commit the nine modified files in writing-habit-el after make test and make compile
-- [ ] Phase 0. Clean the writing-schedule tree and commit the 0.3.1 bump in writing-schedule-py
-- [ ] Phase 1. Promote ten writing-schedule.el functions to public names with obsolete aliases
-- [ ] Phase 1. Add writing-schedule-split-row and its tests
-- [ ] Phase 1. Bump writing-schedule.el to 0.3.1 and fix the MELPA headers
-- [ ] Phase 1. Switch writing-habit-plan.el to the public names and add the Package-Requires entry
-- [ ] Phase 2. Add project-mean and category-mean series to writing-habit-compare.el
-- [ ] Phase 2. Write writing-habit-history.el and the history subcommand
-- [ ] Phase 2. Make writing-habit-name-parse-legend-cell public
-- [ ] Phase 2. Port test_history.py and add a cross-port history fixture
-- [ ] Phase 3. Port weekly_table.py to writing-habit-table.el on top of the scheduler API
-- [ ] Phase 3. Port the byte-for-byte, one-line-edit, and two-line-swap tests first
-- [ ] Phase 3. Add the projects-and-tasks.org parity test (44 events, 12 codes)
-- [ ] Phase 4. Build writing-habit-table-mode with completion, eldoc, and overlays
-- [ ] Phase 4. Add insert, move, insert-project, move-project, report, and rename commands
-- [ ] Phase 5. Build writing-habit-dispatch with nine groups covering both packages
-- [ ] Phase 5. Log every run as its shell line and preview written files
-- [ ] Phase 6. Settle where the templates live and write the new docs pages
-- [ ] Phase 6. Add package-lint and checkdoc to CI and point CI at a writing-schedule checkout
+- [X] Phase 0. Commit the nine modified files in writing-habit-el after make test and make compile
+- [X] Phase 0. Clean the writing-schedule tree and commit the 0.3.1 bump in writing-schedule-py
+- [X] Phase 1. Promote ten writing-schedule.el functions to public names with obsolete aliases
+- [X] Phase 1. Add writing-schedule-split-row and its tests
+- [X] Phase 1. Bump writing-schedule.el to 0.3.1 and fix the MELPA headers
+- [X] Phase 1. Switch writing-habit-plan.el to the public names and add the Package-Requires entry
+- [X] Phase 2. Add project-mean and category-mean series to writing-habit-compare.el
+- [X] Phase 2. Write writing-habit-history.el and the history subcommand
+- [X] Phase 2. Make writing-habit-name-parse-legend-cell public
+- [X] Phase 2. Port test_history.py and add a cross-port history fixture
+- [X] Phase 3. Port weekly_table.py to writing-habit-table.el on top of the scheduler API
+- [X] Phase 3. Port the byte-for-byte, one-line-edit, and two-line-swap tests first
+- [X] Phase 3. Add the projects-and-tasks.org parity test (44 events, 12 codes)
+- [X] Phase 4. Build writing-habit-table-mode with completion, eldoc, and overlays
+- [X] Phase 4. Add insert, move, insert-project, move-project, report, and rename commands
+- [X] Phase 5. Build writing-habit-dispatch with nine groups covering both packages
+- [X] Phase 5. Log every run as its shell line and preview written files
+- [X] Phase 6. Settle where the templates live and write the new docs pages
+- [X] Phase 6. Add package-lint and checkdoc to CI and point CI at a writing-schedule checkout
 - [ ] Phase 6. Submit writing-schedule.el to MELPA before writing-habit-el
 #+END_SRC
