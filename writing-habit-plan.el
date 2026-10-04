@@ -30,13 +30,11 @@
 ;; the entry points, so the rest of the toolkit (db, track, compare, name)
 ;; runs without it loaded.
 ;;
-;; The functions reused from writing-schedule.el are currently internal
-;; (double-dash) names: `writing-schedule--parse',
-;; `writing-schedule--week-monday', and `writing-schedule--iso-date'.
+;; The functions reused from writing-schedule.el are its public API of
+;; version 0.3.1: `writing-schedule-parse-table',
+;; `writing-schedule-week-monday', and `writing-schedule-iso-date'.
 ;; Reusing them keeps a single source of truth rather than copying the
-;; parser.  When writing-schedule.el promotes a public parse entry point,
-;; this file should switch to it; the plan document tracks that as an
-;; upstream follow-up.
+;; parser.
 ;;
 ;; Risk tags.  The writing-schedule legend maps a code to a description,
 ;; for example "A: DNPH1 docking".  To give the barbell view a class to
@@ -60,9 +58,9 @@
 (require 'writing-habit-db)
 (require 'writing-habit-name)   ; for the tag to risk-class map
 
-(declare-function writing-schedule--parse "writing-schedule" (table))
-(declare-function writing-schedule--week-monday "writing-schedule" (time))
-(declare-function writing-schedule--iso-date "writing-schedule" (abs))
+(declare-function writing-schedule-parse-table "writing-schedule" (table))
+(declare-function writing-schedule-week-monday "writing-schedule" (time))
+(declare-function writing-schedule-iso-date "writing-schedule" (abs))
 (declare-function org-table-to-lisp "org-table" (&optional txt))
 (declare-function org-read-date "org" (&rest args))
 
@@ -122,19 +120,26 @@ my-week.org yields my-week."
         (match-string 1 stem)
       stem)))
 
+(defun writing-habit-plan-require-schedule ()
+  "Load writing-schedule.el and check that it offers the 0.3.1 public API.
+Signal an error naming the fix when it is missing or too old."
+  (unless (require 'writing-schedule nil t)
+    (error "This command needs writing-schedule.el 0.3.1 or later on the load-path"))
+  (unless (fboundp 'writing-schedule-parse-table)
+    (error "This command needs writing-schedule.el 0.3.1 or later; the loaded one is older")))
+
 (defun writing-habit-plan-parse-file (path)
   "Return the writing-schedule parse plist for the org table in PATH.
 The plist keys are :events, :legend, :letters, and :columns.  Signal an
 error when writing-schedule.el is not available or PATH has no table."
-  (unless (require 'writing-schedule nil t)
-    (error "Plan import needs writing-schedule.el on the load-path"))
+  (writing-habit-plan-require-schedule)
   (with-temp-buffer
     (insert-file-contents path)
     (org-mode)
     (goto-char (point-min))
     (unless (re-search-forward "^[ \t]*|" nil t)
       (error "No org table found in %s" path))
-    (writing-schedule--parse (org-table-to-lisp))))
+    (writing-schedule-parse-table (org-table-to-lisp))))
 
 (defun writing-habit-plan-import (db path week)
   "Parse the weekly table at PATH for the week containing WEEK, load it into DB.
@@ -147,8 +152,8 @@ import of the same week is a no-op."
   (let* ((parsed (writing-habit-plan-parse-file path))
          (events (plist-get parsed :events))
          (legend (plist-get parsed :legend))
-         (monday-abs (writing-schedule--week-monday (org-read-date nil t week)))
-         (monday-iso (writing-schedule--iso-date monday-abs))
+         (monday-abs (writing-schedule-week-monday (org-read-date nil t week)))
+         (monday-iso (writing-schedule-iso-date monday-abs))
          (unknown '()))
     (dolist (ev events)
       (let* ((letter (plist-get ev :letter))
@@ -158,7 +163,7 @@ import of the same week is a no-op."
              (pid (writing-habit-db-get-or-create-project db letter desc risk))
              (cat-known (writing-habit-plan--category-for (plist-get ev :section)))
              (cat-id (writing-habit-db-get-category-id db (car cat-known)))
-             (day (writing-schedule--iso-date (+ monday-abs (plist-get ev :offset)))))
+             (day (writing-schedule-iso-date (+ monday-abs (plist-get ev :offset)))))
         (unless (cdr cat-known)
           (cl-pushnew (plist-get ev :section) unknown :test #'equal))
         (sqlite-execute
