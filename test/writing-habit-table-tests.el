@@ -1,5 +1,8 @@
 ;;; writing-habit-table-tests.el --- ERT tests for the weekly table model -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Ports the model tests of the Python package's graphical layer

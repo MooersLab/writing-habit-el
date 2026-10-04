@@ -1,5 +1,8 @@
 ;;; writing-habit-table-mode-tests.el --- ERT tests for the table editing mode -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Ports the behavior tests of the Python Schedule tab to the Emacs mode:

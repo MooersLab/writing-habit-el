@@ -1,5 +1,8 @@
 ;;; writing-habit-db-tests.el --- ERT tests for writing-habit-db -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Ports tests/test_schema.py to ERT and adds coverage for the ported db API.

@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/static/v1?label=writing-habit-el&message=0.1.0&color=brightcolor)
 [![CI](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml/badge.svg)](https://github.com/MooersLab/writing-habit-el/actions/workflows/test.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](LICENSE)
 [![Emacs](https://img.shields.io/badge/Emacs-29.1%2B-7F5AB6.svg?logo=gnuemacs&logoColor=white)](https://www.gnu.org/software/emacs/)
 <!-- [![MELPA](https://melpa.org/packages/writing-habit-badge.svg)](https://melpa.org/#/writing-habit) -->
 
@@ -274,7 +274,20 @@ Under active development, and not yet on MELPA. The interfaces may still change.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+The source code is licensed under the GNU General Public License, version 3 or
+any later version (GPL-3.0-or-later), the license used by Emacs itself and by
+`writing-schedule.el`, which this package requires. See [LICENSE](LICENSE).
+
+The figures are licensed under the Creative Commons Attribution 4.0
+International License (CC BY 4.0). This covers the images in `assets/images/`,
+their copies in `docs/imgs/`, and the Graphviz sources in `assets/diagrams/` and
+`docs/_diagrams/`. Each of those directories holds the license text, and
+`assets/images/NOTICE` gives the title and a suggested attribution for every
+image.
+
+The Python twin, `writing-habit`, remains under the MIT License. The shared
+`schema.sql` is the same file in both repositories and is offered under either
+license.
 
 ## Sources of funding
 

@@ -54,6 +54,6 @@ Continuous integration runs the same `make compile` and `make test` across sever
 
 ## License
 
-This project uses split licensing: the source code is under the MIT License, and the images in `assets/images/` are under CC BY 4.0.
+This project uses split licensing: the source code is under the GNU General Public License, version 3 or any later version, and the figures are under CC BY 4.0. The figures are the images in `assets/images/`, their copies in `docs/imgs/`, and the Graphviz sources in `assets/diagrams/` and `docs/_diagrams/`.
 
-By contributing code, you agree that your contributions are licensed under the MIT License; see [LICENSE](LICENSE). By contributing an image or figure, you agree that it is licensed under the Creative Commons Attribution 4.0 International License; see [assets/images/LICENSE](assets/images/LICENSE).
+By contributing code, you agree that your contributions are licensed under GPL-3.0-or-later; see [LICENSE](LICENSE). By contributing an image or figure, you agree that it is licensed under the Creative Commons Attribution 4.0 International License; see [assets/images/LICENSE](assets/images/LICENSE).

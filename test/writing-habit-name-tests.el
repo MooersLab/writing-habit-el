@@ -1,5 +1,8 @@
 ;;; writing-habit-name-tests.el --- ERT tests for writing-habit-name -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; A one-to-one port of tests/test_name.py to ERT.  Run from the repository

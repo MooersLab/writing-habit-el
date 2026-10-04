@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Compare the Elisp weekly table model with the Python one, line for line.
 #
 #   test/parity/run.sh WRITING_SCHEDULE_DIR WRITING_HABIT_PY_DIR WRITING_SCHEDULE_PY_DIR

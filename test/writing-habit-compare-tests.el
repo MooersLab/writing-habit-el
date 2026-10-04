@@ -1,5 +1,8 @@
 ;;; writing-habit-compare-tests.el --- ERT tests for compare and report -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Ports the compare behavior to ERT and checks the org report.  The fixture

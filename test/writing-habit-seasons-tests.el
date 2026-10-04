@@ -1,5 +1,8 @@
 ;;; writing-habit-seasons-tests.el --- ERT tests for the seasons dashboard -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Byte-identical guard against the Python-built seasons golden, rendered from

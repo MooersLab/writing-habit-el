@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Differential probe of the Python weekly table model; see run.sh."""
 import sys, hashlib, copy
 from writing_habit.gui.weekly_table import WeeklyTable, split_due_date

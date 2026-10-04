@@ -1,5 +1,8 @@
 ;;; writing-habit-plan-tests.el --- ERT tests for writing-habit-plan -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Ports the plan-import behavior of the Python package to ERT and adds

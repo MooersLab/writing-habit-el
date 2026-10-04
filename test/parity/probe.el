@@ -1,4 +1,7 @@
 ;;; probe.el --- Differential probe of the weekly table model  -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; Prints one line per reading or edit of each table file named on the
 ;; command line.  probe.py prints the same lines from the Python model, so

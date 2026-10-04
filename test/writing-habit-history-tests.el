@@ -1,5 +1,8 @@
 ;;; writing-habit-history-tests.el --- ERT tests for the adherence history -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Ports tests/test_history.py from the Python package.  The fixture

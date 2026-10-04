@@ -1,5 +1,8 @@
 ;;; writing-habit-dashboard-tests.el --- ERT tests for the HTML dashboard -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Checks the dashboard HTML, including the byte-identical guard against a

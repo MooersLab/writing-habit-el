@@ -1,5 +1,8 @@
 ;;; writing-habit-dispatch-tests.el --- ERT tests for the command center -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Tests the argument translation, the runners, the log, and the suffixes
