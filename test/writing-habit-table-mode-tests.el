@@ -229,6 +229,113 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
     (writing-habit-table-update-legend)
     (should (assoc "Q" (writing-habit-table-legend (writing-habit-table-current))))))
 
+;;;; Deleting
+
+(ert-deftest writing-habit-table-mode/delete-filled-row-asks ()
+  "A row that holds codes is deleted only after a yes."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (let ((text (buffer-string)) (asked nil))
+      (writing-habit-table-mode-tests--goto "04:00-05:30" 3)
+      (cl-letf (((symbol-function 'yes-or-no-p)
+                 (lambda (prompt) (setq asked prompt) nil)))
+        (should-error (writing-habit-table-delete-row) :type 'user-error))
+      (should (equal (buffer-string) text))
+      (should (string-match-p "A B A B W" asked)))))
+
+(ert-deftest writing-habit-table-mode/delete-row-lands-on-the-next-row ()
+  "After a yes the line goes and point lands on the next row, same cell."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (let ((lines (count-lines (point-min) (point-max))) (msg nil))
+      (writing-habit-table-mode-tests--goto "04:00-05:30" 3)
+      (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) t))
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args) (setq msg (apply #'format fmt args)))))
+        (writing-habit-table-delete-row))
+      (should (= (count-lines (point-min) (point-max)) (1- lines)))
+      (should-not (string-match-p "04:00-05:30" (buffer-string)))
+      (should (string-prefix-p "| 05:45-07:15" (writing-habit-table-mode-tests--line)))
+      (should (= (writing-habit-table--cell-at-point) 3))
+      (should (equal msg "Deleted the 04:00-05:30 block from Generative")))))
+
+(ert-deftest writing-habit-table-mode/delete-empty-row-asks-nothing ()
+  "An empty row goes without a question."
+  (writing-habit-table-mode-tests--with ("gA.org" writing-habit-table-mode-tests--clash)
+    (writing-habit-table-mode-tests--goto "09:00-10:00" 1)
+    (let ((b (writing-habit-table--cell-bounds 2)))
+      (delete-region (car b) (cdr b))
+      (goto-char (car b))
+      (insert "    "))
+    (writing-habit-table-mode-tests--goto "09:00-10:00" 1)
+    (cl-letf (((symbol-function 'yes-or-no-p)
+               (lambda (_) (error "An empty row needs no question"))))
+      (writing-habit-table-delete-row))
+    (should-not (string-match-p "09:00-10:00" (buffer-string)))))
+
+(ert-deftest writing-habit-table-mode/delete-row-refuses-a-section ()
+  "A section header and a legend row are not deleted as blocks."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (let ((text (buffer-string)))
+      (writing-habit-table-mode-tests--goto "Rewriting:")
+      (should-error (writing-habit-table-delete-row) :type 'user-error)
+      (writing-habit-table-mode-tests--goto "A: ")
+      (should-error (writing-habit-table-delete-row) :type 'user-error)
+      (should (equal (buffer-string) text)))))
+
+(ert-deftest writing-habit-table-mode/delete-project-in-use-asks ()
+  "A project the grid uses is deleted only after a yes."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (let ((text (buffer-string)) (asked nil))
+      (writing-habit-table-mode-tests--goto "A: ")
+      (cl-letf (((symbol-function 'yes-or-no-p)
+                 (lambda (prompt) (setq asked prompt) nil)))
+        (should-error (writing-habit-table-delete-project) :type 'user-error))
+      (should (equal (buffer-string) text))
+      (should (string-match-p "8 cell(s)" asked)))))
+
+(ert-deftest writing-habit-table-mode/delete-project ()
+  "After a yes the entry goes and point lands on the entry below."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table-mode-tests--goto "B: ")
+    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) t)))
+      (writing-habit-table-delete-project))
+    (should (equal (mapcar #'car (writing-habit-table-legend (writing-habit-table-current)))
+                   '("A" "W" "T" "E")))
+    (should (string-prefix-p "| W: " (writing-habit-table-mode-tests--line)))))
+
+(ert-deftest writing-habit-table-mode/delete-project-needs-a-legend-row ()
+  "Delete project refuses a time block."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table-mode-tests--goto "04:00-05:30" 1)
+    (should-error (writing-habit-table-delete-project) :type 'user-error)))
+
+(ert-deftest writing-habit-table-mode/delete-commands-in-the-menu ()
+  "The table menu offers both delete commands."
+  (skip-unless writing-habit-table-mode-tests--ok)
+  (let ((suffixes (format "%S" (get 'writing-habit-table-menu 'transient--layout))))
+    (should (string-match-p "writing-habit-table-delete-row" suffixes))
+    (should (string-match-p "writing-habit-table-delete-project" suffixes))))
+
+(ert-deftest writing-habit-table-mode/insert-project-offers-aa ()
+  "With A to Z taken the code prompt offers AA."
+  (writing-habit-table-mode-tests--with
+      ("gA.org" (concat "| Time <l>    | M |\n"
+                        "|-------------+---|\n"
+                        "| Generative: |   |\n"
+                        "| 09:00-10:00 | A |\n"
+                        "|-------------+---|\n"
+                        (mapconcat (lambda (c) (format "| %c: x |   |\n" c))
+                                   (number-sequence ?A ?Z) "")))
+    (let ((offered nil))
+      (cl-letf (((symbol-function 'read-string)
+                 (lambda (prompt &optional initial &rest _)
+                   (if (string-prefix-p "Project code" prompt)
+                       (progn (setq offered initial) initial)
+                     "a 27th project")))
+                ((symbol-function 'completing-read) (lambda (&rest _) "none")))
+        (writing-habit-table-insert-project-below))
+      (should (equal offered "AA"))
+      (should (string-prefix-p "| AA: a 27th project" (writing-habit-table-mode-tests--line))))))
+
 ;;;; Completion and eldoc
 
 (ert-deftest writing-habit-table-mode/completion-offers-legend-codes ()

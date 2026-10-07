@@ -132,6 +132,11 @@ line, rules included.
 | `writing-habit-table-suggest-times`, `-insert-block` | function | Insert an empty block beside a row. |
 | `writing-habit-table-move-block`, `-can-move` | function | Move a block, joining a new section when it passes a header. |
 | `writing-habit-table-insert-legend`, `-move-legend` | function | Insert or move a project in the legend. |
+| `writing-habit-table-remove-block`, `-can-remove-block` | function | Delete a time block; a section header stays. |
+| `writing-habit-table-remove-legend` | function | Delete a project from the legend. |
+| `writing-habit-table-cells-using` | function | How many grid cells hold a code. |
+| `writing-habit-table-next-free-code` | function | The first unused code, A to Z and then AA to ZZ. |
+| `writing-habit-table-project-codes` | constant | The 702 codes offered to new projects, in order. |
 | `writing-habit-table-sync-legend` | function | Give every grid code a legend row. |
 | `writing-habit-table-rows-clear-of` | function | The blocks whose range does not overlap a row. |
 | `writing-habit-table-overlaps`, `-conflicting-cells` | function | Clashes by the scheduler's rule. |
@@ -148,6 +153,7 @@ line, rules included.
 | `writing-habit-table-mode-maybe` | function | Turn the mode on in a schedule-code file, from `org-mode-hook`. |
 | `writing-habit-table-menu` | command | The table menu. |
 | `writing-habit-table-report` | command | The name, clashes, totals, and legend in a side window. |
+| `writing-habit-table-delete-row`, `-delete-project` | command | Delete the block or legend entry at point, asking first when it is in use. |
 
 The other commands are listed in {doc}`table-mode`.
 

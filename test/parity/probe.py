@@ -37,6 +37,7 @@ for f in sys.argv[1:]:
                 tg=t.move_target(i,up)
                 if tg is None: p(f,"mv",i,b(up),"None"); continue
                 u=fresh(); at=u.move_block(i,up); p(f,"mv",i,b(up),tg,at,h(u.to_text()),secs(u),u.code_or_problem()[0] or "ERR")
+            u=fresh(); u.remove_block(i); p(f,"del",i,h(u.to_text()),secs(u))
         if r.kind=="legend":
             for up in (True,False):
                 tg=t.legend_move_target(i,up)
@@ -48,6 +49,8 @@ for f in sys.argv[1:]:
                 except ValueError: p(f,"lins",i,b(above),"ERR")
             u=fresh(); code=r.parsed[0]
             ch=u.set_legend(i,code,"Renamed thing", "safe"); p(f,"setleg",i,b(ch),h(u.to_text()))
+            u=fresh(); u.remove_legend(i); p(f,"ldel",i,h(u.to_text()),t.cells_using(code))
+        p(f,"candel",i,b(t.can_remove_block(i)))
     u=fresh(); code=u.next_free_code()
     if code:
         at=u.insert_legend(None,False,code,"",None); p(f,"lins-end",code,at,h(u.to_text()))

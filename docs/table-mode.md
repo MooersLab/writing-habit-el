@@ -49,8 +49,10 @@ idle time.
 | `a` | `writing-habit-table-insert-above` | insert an empty block above the block or section header at point |
 | `b` | `writing-habit-table-insert-below` | insert an empty block below the block or section header at point |
 | `<up>`, `<down>` | `writing-habit-table-move-up`, `-move-down` | move the block or legend entry at point |
+| `d` | `writing-habit-table-delete-row` | delete the time block at point |
 | `p` | `writing-habit-table-insert-project-above` | insert a project into the legend above the entry at point |
 | `P` | `writing-habit-table-insert-project-below` | insert a project below the entry at point, or at the end of the legend |
+| `D` | `writing-habit-table-delete-project` | delete the legend entry at point |
 | `s` | `writing-habit-table-update-legend` | give every code in the grid a legend row |
 | `r` | `writing-habit-table-report` | show the name, clashes, totals, and legend in a side window |
 | `c` | `writing-habit-table-rename-file` | rename the file to the canonical code of its grid |
@@ -92,13 +94,39 @@ and the scheduler keep the first definition.
 Both moves swap lines rather than rewrite them, so a move up undoes a move down
 byte for byte.
 
+### Deleting a time block
+
+Put point on a time block and press `d` in the menu, or run
+`writing-habit-table-delete-row`. A row that still holds project codes asks
+first and lists them. An empty row goes at once. Point lands on the grid row
+that took its place, in the same cell, or on the last grid row when the last
+row went. A section header is never deleted, because the blocks under it would
+silently join the section above and change the activity they count toward.
+
+The line is removed and every other line is left alone, so the file is one line
+shorter. The legend keeps every entry you typed. A blank entry that a sync
+added for a code no cell uses any more is dropped, as when the cell is cleared.
+
 ### Inserting a project
 
-The prompt for the code starts with the first letter that neither the legend
-nor the grid uses yet. A code is a capital letter followed by up to three
+The prompt for the code starts with the first code that neither the legend nor
+the grid uses yet. The single letters come first, and once A to Z are all taken
+the prompt offers `AA`, `AB`, and so on to `ZZ`, which makes room for 702
+projects. A grid cell takes a two-letter code just as it takes a letter, and
+completion offers it. A code is a capital letter followed by up to three
 capitals or digits. A code the legend already defines is refused. The
 description may end in a due date such as `Sept 25`, which eldoc reads, and the
 risk tag is one of `none`, `safe`, and `risky`.
+
+### Deleting a project
+
+Put point on a legend entry and press `D` in the menu, or run
+`writing-habit-table-delete-project`. A project that cells of the grid still use
+asks first and says how many cells, because those cells then show as not in the
+key. Point lands on the entry that took its place. The next sync of the legend,
+by `s` in the menu, adds back a blank entry for every code the grid still uses,
+so clear those cells first when the project should go for good. Deleting a
+project never changes the grid, the totals, or the canonical name.
 
 ### Renaming to the canonical name
 
@@ -108,7 +136,10 @@ filed under the wrong plan shape, and the seasons dashboard then groups it with
 the wrong weeks. `writing-habit-table-rename-file` saves the buffer if you
 agree, renames the file to the code of its grid, and refuses to overwrite a
 different file. A week has no canonical name when a cell holds a code of more
-than one letter, and the report says which code is at fault.
+than one letter, and the report says which code is at fault. Everything else
+reads a two-letter code whole, including the scheduler, the plan importer, the
+totals, and eldoc, so a legend with more than 26 projects is fine. Only a week
+whose cells use the two-letter codes loses its file name.
 
 ## How edits keep the file intact
 

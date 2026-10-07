@@ -94,6 +94,18 @@ This mirrors the section rule of the scheduler parser.")
 (defconst writing-habit-table-risk-label '(("safe" . "safe") ("speculative" . "risky"))
   "The word shown for each risk class in a tooltip.")
 
+(defconst writing-habit-table-project-codes
+  (append (mapcar #'char-to-string (number-sequence ?A ?Z))
+          (mapcan (lambda (a)
+                    (mapcar (lambda (b) (string a b)) (number-sequence ?A ?Z)))
+                  (number-sequence ?A ?Z)))
+  "The codes offered to a new project, in order.
+The 26 single letters come first, and the two-letter codes AA to ZZ
+follow, as the columns of a spreadsheet do, so a legend can hold up to
+702 projects.  Both readers accept a code of up to four characters, so a
+two-letter code works in the grid and in the legend.  Only the file name
+is limited to single letters.")
+
 (defconst writing-habit-table--month
   "\\(?:jan\\|feb\\|mar\\|apr\\|may\\|jun\\|jul\\|aug\\|sep\\|oc\\|nov\\|dec\\)[a-z]*\\.?"
   "The start of a month name, so a slip such as Ocotober still reads.")
@@ -501,11 +513,15 @@ header."
     at))
 
 (defun writing-habit-table-next-free-code (table)
-  "Return the first letter used by neither the legend nor the grid of TABLE."
+  "Return the first code used by neither the legend nor the grid of TABLE.
+The single letters are offered first.  Once all 26 are taken, the
+two-letter codes follow in the order AA, AB, and so on to ZZ, so a
+legend is no longer capped at 26 projects.  An empty string means every
+one of the 702 codes is taken."
   (let ((taken (append (mapcar #'car (writing-habit-table-legend table))
                        (writing-habit-table-used-codes table))))
-    (or (seq-find (lambda (l) (not (member l taken)))
-                  (mapcar #'char-to-string (number-sequence ?A ?Z)))
+    (or (seq-find (lambda (code) (not (member code taken)))
+                  writing-habit-table-project-codes)
         "")))
 
 (defun writing-habit-table-insert-legend (table near above code
@@ -543,11 +559,24 @@ already defines, because the readers keep the first definition."
         at))))
 
 (defun writing-habit-table-remove-legend (table row-index)
-  "Drop legend row ROW-INDEX from TABLE."
+  "Drop legend row ROW-INDEX from TABLE.
+A code whose last definition goes is also forgotten as one that
+`writing-habit-table-sync-legend' added, so a later sync does not treat
+the writer's deletion as its own row to drop."
   (unless (eq (writing-habit-table--kind table row-index) 'legend)
     (error "Not a legend row"))
-  (writing-habit-table--pop-row table row-index)
+  (let ((code (car (writing-habit-table-row-parsed
+                    (writing-habit-table--pop-row table row-index)))))
+    (unless (assoc code (writing-habit-table-legend table))
+      (setf (writing-habit-table-synced-codes table)
+            (delete code (writing-habit-table-synced-codes table)))))
   (setf (writing-habit-table-dirty table) t))
+
+(defun writing-habit-table-cells-using (table code)
+  "Return how many grid cells of TABLE hold CODE."
+  (let ((code (upcase (string-trim code))))
+    (seq-count (lambda (b) (equal (writing-habit-table-block-letter b) code))
+               (writing-habit-table-blocks table))))
 
 (defun writing-habit-table-sync-legend (table)
   "Make the legend of TABLE cover every code used in its grid.
@@ -723,6 +752,28 @@ block into the neighbouring section."
     (writing-habit-table--resection table)
     (setf (writing-habit-table-dirty table) t)
     target))
+
+;;;; Deleting time-block rows
+
+(defun writing-habit-table-can-remove-block (table row-index)
+  "Return non-nil when row ROW-INDEX of TABLE is a deletable time block.
+This is the test `writing-habit-table-remove-block' applies.  Only a
+time-block row is deleted.  A section header stays, because
+deleting it would silently move every block under it into the section
+above and change the activity those blocks count toward."
+  (eq (writing-habit-table--kind table row-index) 'block))
+
+(defun writing-habit-table-remove-block (table row-index)
+  "Delete time-block row ROW-INDEX of TABLE and return the removed row.
+The line is removed and every other line is left untouched, so the saved
+file differs from the one on disk by exactly one line.  The legend is
+not touched here."
+  (unless (writing-habit-table-can-remove-block table row-index)
+    (error "Only a time-block row can be deleted; a section header and the legend stay"))
+  (let ((row (writing-habit-table--pop-row table row-index)))
+    (writing-habit-table--resection table)
+    (setf (writing-habit-table-dirty table) t)
+    row))
 
 ;;;; Moving legend rows
 

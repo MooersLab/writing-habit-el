@@ -38,10 +38,11 @@
 ;;  - Completion in a day cell offers the legend codes, and eldoc shows the
 ;;    project name, due date, and risk of the code at point.
 ;;  - Commands insert a time block with a suggested range, move a block or
-;;    a legend entry with M-<up> and M-<down>, insert a project with the
-;;    next free code, rename the file to its canonical schedule code, and
-;;    open a side window that reports the name, clashes, totals, and legend
-;;    of the week.
+;;    a legend entry with M-<up> and M-<down>, delete a block or a legend
+;;    entry, insert a project with the next free code (a single letter, or
+;;    AA, AB, and so on once A to Z are taken), rename the file to its
+;;    canonical schedule code, and open a side window that reports the
+;;    name, clashes, totals, and legend of the week.
 ;;
 ;; Every edit goes through the model in writing-habit-table.el, so a cell
 ;; edit rewrites one line and a move swaps lines, and the scheduler always
@@ -270,6 +271,75 @@ in the buffer, run `org-metadown'."
   (interactive)
   (writing-habit-table--move nil))
 
+;;;; Deleting time blocks and projects
+
+(defun writing-habit-table-delete-row ()
+  "Delete the time block at point.
+A row that still holds project codes is deleted only after you confirm,
+and an empty row goes at once.  A section header is never deleted,
+because the blocks under it would silently join the section above.
+Point lands on the row that took its place, in the same cell.  The
+legend keeps every entry you typed; a blank entry that a sync added for
+a code no cell uses any more is dropped, as when the cell is cleared."
+  (interactive)
+  (let* ((model (writing-habit-table-current))
+         (row (writing-habit-table--row-at-point model))
+         (cell (writing-habit-table--cell-at-point)))
+    (unless (writing-habit-table-can-remove-block model row)
+      (user-error (if (eq (writing-habit-table--kind model row) 'section)
+                      "A section header is not deleted; delete the blocks under it"
+                    "Put point on a time block first")))
+    (let* ((victim (writing-habit-table-row-at model row))
+           (times (writing-habit-table-row-parsed victim))
+           (section (writing-habit-table-row-section victim))
+           (filled (delq nil (mapcar (lambda (column)
+                                       (let ((text (writing-habit-table-cell
+                                                    model row (car column))))
+                                         (unless (string-empty-p text) text)))
+                                     (writing-habit-table-columns model)))))
+      (when (and filled
+                 (not (yes-or-no-p
+                       (format "The %s-%s block holds %d project code(s): %s.  Delete the row? "
+                               (car times) (cdr times) (length filled)
+                               (string-join filled " ")))))
+        (user-error "Nothing deleted"))
+      (writing-habit-table-remove-block model row)
+      (writing-habit-table-sync-legend model)
+      (writing-habit-table--apply model)
+      (let ((grid (writing-habit-table--grid-rows model)))
+        (when grid
+          (writing-habit-table--goto
+           model (or (seq-find (lambda (i) (>= i row)) grid) (car (last grid))) cell)))
+      (message "Deleted the %s-%s block from %s" (car times) (cdr times) section))))
+
+(defun writing-habit-table-delete-project ()
+  "Delete the legend entry at point.
+A project that cells of the grid still use is deleted only after you
+confirm, because those cells then show as not in the key.  The next
+sync of the legend, such as `writing-habit-table-update-legend', adds
+back a blank entry for every code the grid still uses, so clear those
+cells first when the project should go for good."
+  (interactive)
+  (let* ((model (writing-habit-table-current))
+         (row (writing-habit-table--require-row model '(legend)))
+         (cell (writing-habit-table--cell-at-point))
+         (code (car (writing-habit-table-row-parsed (writing-habit-table-row-at model row))))
+         (used (writing-habit-table-cells-using model code)))
+    (when (and (> used 0)
+               (not (yes-or-no-p
+                     (format "%d cell(s) of the grid use %s.  Delete %s from the legend? "
+                             used code code))))
+      (user-error "Nothing deleted"))
+    (writing-habit-table-remove-legend model row)
+    (writing-habit-table--apply model)
+    (let ((legend (writing-habit-table-legend-rows model)))
+      (when legend
+        (writing-habit-table--goto
+         model (or (seq-find (lambda (i) (>= i row)) legend) (car (last legend)))
+         (or cell 0))))
+    (message "Deleted project %s from the legend%s" code
+             (if (> used 0) (format "; %d cell(s) still use it" used) ""))))
+
 ;;;; The legend
 
 (defun writing-habit-table--read-project (model)
@@ -297,7 +367,8 @@ With point outside the legend, add the project at the end of the legend."
 
 (defun writing-habit-table-insert-project-above ()
   "Insert a project into the legend above the entry at point.
-The code starts as the first letter neither the legend nor the grid uses.
+The code starts as the first code neither the legend nor the grid uses:
+a single letter while one is free, and then AA, AB, and so on.
 A code the legend already defines is refused."
   (interactive)
   (writing-habit-table--insert-project t))
@@ -520,10 +591,12 @@ the wrong plan shape."
     ("a" "Insert block above" writing-habit-table-insert-above)
     ("b" "Insert block below" writing-habit-table-insert-below)
     ("<up>" "Move up" writing-habit-table-move-up :transient t)
-    ("<down>" "Move down" writing-habit-table-move-down :transient t)]
+    ("<down>" "Move down" writing-habit-table-move-down :transient t)
+    ("d" "Delete block" writing-habit-table-delete-row)]
    ["Legend"
     ("p" "Insert project above" writing-habit-table-insert-project-above)
     ("P" "Insert project below" writing-habit-table-insert-project-below)
+    ("D" "Delete project" writing-habit-table-delete-project)
     ("s" "Sync legend with grid" writing-habit-table-update-legend)]
    ["Week"
     ("r" "Report" writing-habit-table-report)

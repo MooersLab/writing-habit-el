@@ -572,5 +572,110 @@ BODY runs with `example' bound to the named example week."
                    '(:code "A" :name "1003molGraphicsR01" :due "Sept 25" :risk "risky")))
     (should-not (writing-habit-table-project-info table "Z"))))
 
+;;;; Deleting rows and two-letter codes
+
+(defun writing-habit-table-tests--full-legend ()
+  "Return a one-block table whose legend defines A to Z."
+  (writing-habit-table-from-text
+   (concat "| Time <l>    | M |\n"
+           "|-------------+---|\n"
+           "| Generative: |   |\n"
+           "| 09:00-10:00 |   |\n"
+           "|-------------+---|\n"
+           (mapconcat (lambda (c) (format "| %c: |   |\n" c))
+                      (number-sequence ?A ?Z) ""))))
+
+(writing-habit-table-tests--deftest delete-block-removes-one-line
+  "Deleting a block removes its line and leaves every other line alone."
+  (let* ((before (writing-habit-table-tests--lines example))
+         (target (nth 1 (writing-habit-table-block-rows example)))
+         (raw (writing-habit-table-row-raw (writing-habit-table-row-at example target)))
+         (row (writing-habit-table-remove-block example target)))
+    (should (equal (writing-habit-table-row-raw row) raw))
+    (should (equal (writing-habit-table-tests--lines example) (remove raw before)))
+    (should (writing-habit-table-dirty example))))
+
+(writing-habit-table-tests--deftest delete-block-keeps-sections
+  "The remaining blocks keep their sections."
+  (writing-habit-table-remove-block example (car (writing-habit-table-block-rows example)))
+  (should (equal (mapcar (lambda (i) (writing-habit-table-row-section
+                                      (writing-habit-table-row-at example i)))
+                         (writing-habit-table-block-rows example))
+                 '("Generative" "Rewriting" "Supporting"))))
+
+(writing-habit-table-tests--deftest delete-only-a-block
+  "A section header, a legend row, and an index out of range are refused."
+  (dolist (index (list (car (writing-habit-table-tests--sections example))
+                       (car (writing-habit-table-legend-rows example))
+                       -1 (length (writing-habit-table-rows example))))
+    (should-not (writing-habit-table-can-remove-block example index))
+    (should-error (writing-habit-table-remove-block example index)))
+  (should-not (writing-habit-table-dirty example)))
+
+(writing-habit-table-tests--deftest delete-block-keeps-the-legend
+  "A project whose last block goes keeps its legend entry."
+  (writing-habit-table-remove-block example (car (last (writing-habit-table-block-rows example))))
+  (should (= (writing-habit-table-cells-using example "E") 0))
+  (should (assoc "E" (writing-habit-table-legend example))))
+
+(writing-habit-table-tests--deftest delete-project-removes-one-line
+  "Deleting a legend entry removes its line and leaves the grid alone."
+  (let ((grid (mapcar #'writing-habit-table-row-raw
+                      (seq-filter (lambda (r) (eq (writing-habit-table-row-kind r) 'block))
+                                  (writing-habit-table-rows example))))
+        (count (length (writing-habit-table-tests--lines example))))
+    (writing-habit-table-remove-legend example (nth 2 (writing-habit-table-legend-rows example)))
+    (should (equal (mapcar #'car (writing-habit-table-legend example)) '("A" "B" "T" "E")))
+    (should (= (length (writing-habit-table-tests--lines example)) (1- count)))
+    (should (equal (mapcar #'writing-habit-table-row-raw
+                           (seq-filter (lambda (r) (eq (writing-habit-table-row-kind r) 'block))
+                                       (writing-habit-table-rows example)))
+                   grid))))
+
+(writing-habit-table-tests--deftest cells-using-counts-the-grid
+  "The count of cells per code."
+  (should (= (writing-habit-table-cells-using example "A") 8))
+  (should (= (writing-habit-table-cells-using example "e") 5))
+  (should (= (writing-habit-table-cells-using example "Q") 0)))
+
+(writing-habit-table-tests--deftest deleted-synced-code-is-forgotten
+  "Removing a legend row that a sync added forgets the code."
+  (writing-habit-table-set-cell example (car (writing-habit-table-block-rows example)) 6 "Q")
+  (writing-habit-table-sync-legend example)
+  (should (member "Q" (writing-habit-table-synced-codes example)))
+  (writing-habit-table-remove-legend example (car (last (writing-habit-table-legend-rows example))))
+  (should-not (member "Q" (writing-habit-table-synced-codes example))))
+
+(writing-habit-table-tests--deftest project-codes-run-from-a-to-zz
+  "The single letters come first and the two-letter codes follow."
+  (should (equal (seq-take writing-habit-table-project-codes 28)
+                 (append (mapcar #'char-to-string (number-sequence ?A ?Z)) '("AA" "AB"))))
+  (should (equal (car (last writing-habit-table-project-codes)) "ZZ"))
+  (should (= (length (delete-dups (copy-sequence writing-habit-table-project-codes))) 702)))
+
+(writing-habit-table-tests--deftest next-free-code-follows-z-with-aa
+  "Once A to Z are taken the next free code is AA, then AB."
+  (let ((table (writing-habit-table-tests--full-legend)))
+    (should (= (length (writing-habit-table-legend table)) 26))
+    (should (equal (writing-habit-table-next-free-code table) "AA"))
+    (writing-habit-table-insert-legend table nil nil "AA" "a 27th project")
+    (should (equal (writing-habit-table-next-free-code table) "AB"))
+    (writing-habit-table-set-cell table (car (writing-habit-table-block-rows table)) 1 "ab")
+    (should (equal (writing-habit-table-next-free-code table) "AC"))))
+
+(writing-habit-table-tests--deftest two-letter-cell-reaches-the-readers
+  "A two-letter code in a cell is read whole and has no canonical name."
+  (let ((table (writing-habit-table-tests--full-legend)))
+    (writing-habit-table-insert-legend table nil nil "AB" "a 28th project" "safe")
+    (writing-habit-table-set-cell table (car (writing-habit-table-block-rows table)) 1 "AB")
+    (should (equal (writing-habit-table-used-codes table) '("AB")))
+    (should (equal (plist-get (writing-habit-table-project-info table "AB") :risk) "safe"))
+    (should (equal (mapcar (lambda (ev) (plist-get ev :letter))
+                           (plist-get (writing-schedule-parse-text
+                                       (writing-habit-table-to-text table))
+                                      :events))
+                   '("AB")))
+    (should-not (car (writing-habit-table-code-or-problem table)))))
+
 (provide 'writing-habit-table-tests)
 ;;; writing-habit-table-tests.el ends here
