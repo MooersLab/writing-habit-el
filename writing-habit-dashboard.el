@@ -148,10 +148,6 @@
   "Return VALUE as a whole-number percent of WHOLE, rounded half up."
   (if (<= whole 0) 0 (floor (+ 0.5 (/ (* 100.0 value) whole)))))
 
-(defun writing-habit-dashboard--fmt2 (value)
-  "Format an adherence VALUE, or \"n/a\" when nil."
-  (if (null value) "n/a" (format "%.2f" value)))
-
 (defun writing-habit-dashboard--ratio (actual planned)
   "Format ACTUAL over PLANNED to two places, or \"n/a\" when PLANNED is zero.
 Every displayed ratio is computed here rather than read from the adherence
