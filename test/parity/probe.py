@@ -23,6 +23,9 @@ for f in sys.argv[1:]:
     p(f,"ovl","\n".join(t.overlaps() and __import__('writing_schedule.overlap',fromlist=['x']).overlap_lines(t.overlaps()) or []))
     p(f,"conf",";".join(f"{r},{c}" for r,c in sorted(t.conflicting_cells())))
     p(f,"used",",".join(t.used_codes()),t.next_free_code())
+    for bl in t.blocks(): p(f,"act",bl.row,bl.column,bl.letter,bl.category,bl.activity_source,bl.event_section)
+    p(f,"defaults",";".join(f"{k}={v}" for k,v in t.legend_defaults().items()))
+    u=fresh(); n=u.move_activities_into_cells(); m=u.remove_section_rows(); p(f,"mvact",n,m,h(u.to_text()),u.code_or_problem()[0] or "ERR")
     for r in t.block_rows: p(f,"clear",r,",".join(map(str,t.rows_clear_of(r))))
     for i,r in enumerate(t.rows):
         if r.kind in ("block","section") and t.columns:

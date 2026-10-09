@@ -39,6 +39,7 @@ Decodes a schedule file-name code. Needs no database and no third-party package.
 | `writing-habit-name` | command | Decode a code and show a report; with a prefix argument, check it against a table legend. |
 | `writing-habit-name-decode` | function | Return an alist of day to blocks for the week the code names. |
 | `writing-habit-name-summary` | function | Return the block totals by activity and by project. |
+| `writing-habit-name-legend-activity`, `-split-legend-activity` | function | Read and strip a default activity tag such as `@support` in a legend cell. |
 | `writing-habit-name-read-legend` | function | Read a weekly table's legend into an alist. |
 | `writing-habit-name-check-against-legend` | function | Match each project letter to a legend entry. |
 | `writing-habit-name-report-string` | function | Return the full decode-and-check report as a string. |
@@ -137,6 +138,11 @@ line, rules included.
 | `writing-habit-table-cells-using` | function | How many grid cells hold a code. |
 | `writing-habit-table-next-free-code` | function | The first unused code, A to Z and then AA to ZZ. |
 | `writing-habit-table-project-codes` | constant | The 702 codes offered to new projects, in order. |
+| `writing-habit-table-split-cell`, `-normalize-cell` | function | Split a cell such as `eA` into its activity letter and code. |
+| `writing-habit-table-block-category`, `-block-activity-source` | function | The resolved activity of a block, and where it came from. |
+| `writing-habit-table-legend-defaults` | function | The default activity of each legend code. |
+| `writing-habit-table-activity-fallbacks`, `-prefix-overrides` | function | Blocks counted as generative by default, and letters that override their section. |
+| `writing-habit-table-move-activities-into-cells`, `-remove-section-rows` | function | Write section letters into the cells, then drop the section rows. |
 | `writing-habit-table-sync-legend` | function | Give every grid code a legend row. |
 | `writing-habit-table-rows-clear-of` | function | The blocks whose range does not overlap a row. |
 | `writing-habit-table-overlaps`, `-conflicting-cells` | function | Clashes by the scheduler's rule. |
@@ -154,6 +160,7 @@ line, rules included.
 | `writing-habit-table-menu` | command | The table menu. |
 | `writing-habit-table-report` | command | The name, clashes, totals, and legend in a side window. |
 | `writing-habit-table-delete-row`, `-delete-project` | command | Delete the block or legend entry at point, asking first when it is in use. |
+| `writing-habit-table-move-activities` | command | Move the section activities into the cells. |
 
 The other commands are listed in {doc}`table-mode`.
 

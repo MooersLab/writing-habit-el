@@ -25,8 +25,9 @@ loads only for a file whose name qualifies.
 |--------|---------|
 | a red day cell | the block overlaps another block on the same day |
 | a yellow row | with point in the Time column of a block, this block does not overlap it |
+| a pale blue, green, or lilac day cell | the block counts as generative, editing, or support writing |
 | `WH[2 clashes]` in the mode line | the number of overlapping pairs in the week |
-| the echo area | the name, due date, and risk of the code in the day cell at point |
+| the echo area | the name, due date, risk, and activity of the code in the day cell at point |
 
 The overlap rule is the scheduler's own, because the mode calls
 `writing-schedule-overlaps` from the public API of `writing-schedule.el` 0.3.1.
@@ -36,7 +37,10 @@ whose end is not after its start runs past midnight. A clash cell stays red
 inside a yellow row, because the clash is the more urgent thing to see.
 
 Press `M-TAB` or `C-M-i` in a day cell to complete a project code from the
-legend. The tints refresh after `writing-habit-table-idle-delay` seconds of
+legend, also after an activity letter such as the `e` of `eA`. Set
+`writing-habit-table-tint-activities` to nil to turn the activity tints off, or
+customize the faces `writing-habit-table-generative`, `-editing`, and
+`-support`. The tints refresh after `writing-habit-table-idle-delay` seconds of
 idle time.
 
 ## Commands
@@ -53,6 +57,7 @@ idle time.
 | `p` | `writing-habit-table-insert-project-above` | insert a project into the legend above the entry at point |
 | `P` | `writing-habit-table-insert-project-below` | insert a project below the entry at point, or at the end of the legend |
 | `D` | `writing-habit-table-delete-project` | delete the legend entry at point |
+| `m` | `writing-habit-table-move-activities` | write each section's activity letter into its cells, then offer to delete the section rows |
 | `s` | `writing-habit-table-update-legend` | give every code in the grid a legend row |
 | `r` | `writing-habit-table-report` | show the name, clashes, totals, and legend in a side window |
 | `c` | `writing-habit-table-rename-file` | rename the file to the canonical code of its grid |
@@ -115,8 +120,9 @@ the prompt offers `AA`, `AB`, and so on to `ZZ`, which makes room for 702
 projects. A grid cell takes a two-letter code just as it takes a letter, and
 completion offers it. A code is a capital letter followed by up to three
 capitals or digits. A code the legend already defines is refused. The
-description may end in a due date such as `Sept 25`, which eldoc reads, and the
-risk tag is one of `none`, `safe`, and `risky`.
+description may end in a due date such as `Sept 25`, which eldoc reads, the
+risk tag is one of `none`, `safe`, and `risky`, and the default activity is one
+of `none`, `generative`, `editing`, and `support`.
 
 ### Deleting a project
 
@@ -127,6 +133,37 @@ key. Point lands on the entry that took its place. The next sync of the legend,
 by `s` in the menu, adds back a blank entry for every code the grid still uses,
 so clear those cells first when the project should go for good. Deleting a
 project never changes the grid, the totals, or the canonical name.
+
+### Choosing the activity of each block
+
+The activity of a block comes from the first of these that is present.
+
+| Source | Written as | Example |
+|--------|------------|---------|
+| A letter in the cell | lowercase `g`, `e`, or `s` before the code | `eA` is editing on A |
+| The project's default | a tag in the legend description | `E: email @support` |
+| The section header | a header row above the block | `Rewriting:` |
+| Nothing at all | | counted as generative |
+
+A letter counts only when it is a lowercase `g`, `e`, or `s` followed by a
+capital, so a cell typed as `ga` is still the code `GA`. The scheduler applies
+the same rule, so the calendar, the dated schedule, and the plan importer agree
+with the buffer. Eldoc ends with the activity and where it came from, as in
+`editing (from the cell)`. The report lists the cells whose letter overrides
+their section, the default activities, and any block counted as generative
+because it has none of the four.
+
+With letters in the cells, a table needs no section rows, and one time slot can
+hold different activities on different days. `m` in the menu, or
+`writing-habit-table-move-activities`, writes each section's letter into the
+bare cells under it and then asks whether to delete the section rows. With a
+prefix argument it deletes them without asking. A cell that has a letter keeps
+it, and a cell whose project has a default activity stays bare. Every block
+keeps its activity, and the canonical name does not change.
+
+For a smaller starter table, run `C-u M-x writing-schedule-insert-template`
+from `writing-schedule.el` 0.4.0. It offers three-block days for a morning
+writer, an evening writer, and a split day.
 
 ### Renaming to the canonical name
 

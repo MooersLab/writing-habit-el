@@ -336,6 +336,88 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
       (should (equal offered "AA"))
       (should (string-prefix-p "| AA: a 27th project" (writing-habit-table-mode-tests--line))))))
 
+;;;; Activities
+
+(ert-deftest writing-habit-table-mode/move-activities-into-cells ()
+  "The command writes the section letters and can delete the headers."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table-move-activities t)
+    (should-not (string-match-p "^| Generative:" (buffer-string)))
+    (writing-habit-table-mode-tests--goto "04:00-05:30")
+    (should (string-match-p "| gA " (writing-habit-table-mode-tests--line)))
+    (writing-habit-table-mode-tests--goto "13:15-14:45")
+    (should (string-match-p "| sE " (writing-habit-table-mode-tests--line)))))
+
+(ert-deftest writing-habit-table-mode/move-activities-can-keep-headers ()
+  "Answering no keeps the section rows."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (cl-letf (((symbol-function 'y-or-n-p) (lambda (_) nil)))
+      (writing-habit-table-move-activities))
+    (should (string-match-p "^| Generative:" (buffer-string)))
+    (should (string-match-p "| gA " (buffer-string)))))
+
+(ert-deftest writing-habit-table-mode/eldoc-names-the-activity ()
+  "Eldoc gives the activity and where it came from."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table-mode-tests--goto "04:00-05:30" 1)
+    (should (string-match-p "generative (from the section)" (writing-habit-table-eldoc)))
+    (let ((b (writing-habit-table--cell-bounds 1)))
+      (delete-region (car b) (cdr b))
+      (goto-char (car b))
+      (insert " eA "))
+    (writing-habit-table-mode-tests--goto "04:00-05:30" 1)
+    (should (string-match-p "\\`A: DNPH1 docking.*editing (from the cell)"
+                            (writing-habit-table-eldoc)))))
+
+(ert-deftest writing-habit-table-mode/cells-are-tinted-by-activity ()
+  "Each filled day cell carries the face of its activity."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table--refresh t)
+    (writing-habit-table-mode-tests--goto "13:15-14:45" 1)
+    (should (memq 'writing-habit-table-support
+                  (mapcar (lambda (ov) (overlay-get ov 'face)) (overlays-at (point)))))
+    (writing-habit-table-mode-tests--goto "04:00-05:30" 1)
+    (should (memq 'writing-habit-table-generative
+                  (mapcar (lambda (ov) (overlay-get ov 'face)) (overlays-at (point)))))))
+
+(ert-deftest writing-habit-table-mode/completion-after-a-letter ()
+  "Completion after an activity letter completes the code."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table-mode-tests--goto "04:00-05:30" 6)
+    (let ((b (writing-habit-table--cell-bounds 6)))
+      (goto-char (car b))
+      (delete-region (car b) (cdr b))
+      (insert " e  ")
+      (goto-char (+ (car b) 2)))
+    (let ((capf (writing-habit-table-completion-at-point)))
+      (should capf)
+      (should (= (nth 0 capf) (point)))
+      (should (member "A" (nth 2 capf))))))
+
+(ert-deftest writing-habit-table-mode/insert-project-asks-for-an-activity ()
+  "A new project may carry a default activity."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (writing-habit-table-mode-tests--goto "A: ")
+    (cl-letf (((symbol-function 'read-string)
+               (lambda (prompt &optional initial &rest _)
+                 (if (string-prefix-p "Project code" prompt) initial "talks")))
+              ((symbol-function 'completing-read)
+               (lambda (prompt &rest _)
+                 (if (string-prefix-p "Default activity" prompt) "support" "none"))))
+      (writing-habit-table-insert-project-below))
+    (should (string-prefix-p "| C: talks @support" (writing-habit-table-mode-tests--line)))))
+
+(ert-deftest writing-habit-table-mode/report-lists-activities ()
+  "The report names overrides and default activities."
+  (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
+    (let ((model (writing-habit-table-current)))
+      (writing-habit-table-set-cell model (car (writing-habit-table-block-rows model)) 1 "eA")
+      (writing-habit-table-set-legend model (car (last (writing-habit-table-legend-rows model)))
+                                      "E" "email" nil "support")
+      (let ((text (writing-habit-table-report-string model)))
+        (should (string-match-p "overrides their section" text))
+        (should (string-match-p "Default activities: E support" text))))))
+
 ;;;; Completion and eldoc
 
 (ert-deftest writing-habit-table-mode/completion-offers-legend-codes ()
@@ -352,20 +434,24 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
   "Eldoc gives the name, due date, and risk of the code at point."
   (writing-habit-table-mode-tests--with ("gA.org" writing-habit-table-mode-tests--clash)
     (writing-habit-table-mode-tests--goto "04:00-05:30" 1)
-    (should (equal (writing-habit-table-eldoc) "A: one, due Sept 25, safe"))
+    (should (equal (writing-habit-table-eldoc)
+                   "A: one, due Sept 25, safe, generative (from the section)"))
     (writing-habit-table-mode-tests--goto "09:00-10:00" 2)
-    (should (equal (writing-habit-table-eldoc) "B: two, risky"))
+    (should (equal (writing-habit-table-eldoc) "B: two, risky, editing (from the section)"))
     (writing-habit-table-mode-tests--goto "09:00-10:00" 1)
     (should-not (writing-habit-table-eldoc))))
 
 ;;;; Tints
 
 (defun writing-habit-table-mode-tests--faces ()
-  "Return the (FACE . TEXT) of each tint overlay, sorted by position."
+  "Return the (FACE . TEXT) of each clash or clear overlay, sorted by position.
+The pale activity tints are left out; a test of their own covers them."
   (mapcar (lambda (ov) (cons (overlay-get ov 'face)
                              (string-trim (buffer-substring-no-properties
                                            (overlay-start ov) (overlay-end ov)))))
-          (sort (copy-sequence writing-habit-table--overlays)
+          (sort (seq-remove (lambda (ov) (rassq (overlay-get ov 'face)
+                                                writing-habit-table--activity-faces))
+                            (copy-sequence writing-habit-table--overlays))
                 (lambda (a b) (< (overlay-start a) (overlay-start b))))))
 
 (ert-deftest writing-habit-table-mode/clash-cells-are-red ()

@@ -35,14 +35,19 @@
 ;;  - With point in the Time column of a block, every block whose range
 ;;    does not overlap it is tinted yellow.  A clash stays red inside a
 ;;    yellow row, because the clash is the more urgent thing to see.
-;;  - Completion in a day cell offers the legend codes, and eldoc shows the
-;;    project name, due date, and risk of the code at point.
+;;  - Each filled day cell is tinted pale by its activity, which comes from
+;;    a letter in the cell (gA, eA, sA), the project's default activity in
+;;    the legend (E: email @support), or the section header, in that order.
+;;  - Completion in a day cell offers the legend codes, also after an
+;;    activity letter, and eldoc shows the project name, due date, risk,
+;;    and activity of the code at point.
 ;;  - Commands insert a time block with a suggested range, move a block or
 ;;    a legend entry with M-<up> and M-<down>, delete a block or a legend
 ;;    entry, insert a project with the next free code (a single letter, or
-;;    AA, AB, and so on once A to Z are taken), rename the file to its
-;;    canonical schedule code, and open a side window that reports the
-;;    name, clashes, totals, and legend of the week.
+;;    AA, AB, and so on once A to Z are taken), move the section activities
+;;    into the cells, rename the file to its canonical schedule code, and
+;;    open a side window that reports the name, clashes, totals, and legend
+;;    of the week.
 ;;
 ;; Every edit goes through the model in writing-habit-table.el, so a cell
 ;; edit rewrites one line and a move swaps lines, and the scheduler always
@@ -87,6 +92,40 @@ Set it before the mode first loads."
     (t :background "#ffd0d0" :foreground "#7a0000"))
   "Face for a day cell whose block overlaps another block on that day."
   :group 'writing-habit-table)
+
+(defcustom writing-habit-table-tint-activities t
+  "When non-nil, tint each filled day cell by its activity."
+  :type 'boolean
+  :group 'writing-habit-table)
+
+(defface writing-habit-table-generative
+  '((((background dark)) :background "#1f3347")
+    (t :background "#dcebfa"))
+  "Face for a day cell whose block is generative writing."
+  :group 'writing-habit-table)
+
+(defface writing-habit-table-editing
+  '((((background dark)) :background "#26391f")
+    (t :background "#e2f2dc"))
+  "Face for a day cell whose block is editing."
+  :group 'writing-habit-table)
+
+(defface writing-habit-table-support
+  '((((background dark)) :background "#352a3f")
+    (t :background "#efe7f6"))
+  "Face for a day cell whose block is support writing."
+  :group 'writing-habit-table)
+
+(defconst writing-habit-table--activity-faces
+  '(("generative" . writing-habit-table-generative)
+    ("editing" . writing-habit-table-editing)
+    ("support" . writing-habit-table-support))
+  "The face of each activity.")
+
+(defconst writing-habit-table--source-labels
+  '((cell . "from the cell") (legend . "the project's default")
+    (section . "from the section") (none . "no section, so generative"))
+  "How eldoc names where a block's activity came from.")
 
 (defface writing-habit-table-clear
   '((((background dark)) :background "#4a4400")
@@ -340,16 +379,44 @@ cells first when the project should go for good."
     (message "Deleted project %s from the legend%s" code
              (if (> used 0) (format "; %d cell(s) still use it" used) ""))))
 
+;;;; Moving the activity into the cells
+
+(defun writing-habit-table-move-activities (&optional delete-sections)
+  "Write each section's activity letter into the bare cells under it.
+A cell such as A under Rewriting becomes eA.  A cell that has a letter
+already, or whose project names a default activity, is left as it is.
+Then ask whether to delete the section rows, which no longer decide
+anything; with DELETE-SECTIONS non-nil, or a prefix argument, delete
+them without asking."
+  (interactive "P")
+  (let* ((model (writing-habit-table-current))
+         (changed (writing-habit-table-move-activities-into-cells model))
+         (sections (writing-habit-table--indexes model '(section)))
+         (removed (if (and sections
+                           (or delete-sections
+                               (y-or-n-p (format "%d cell(s) now carry their activity letter.  Delete the section rows too? "
+                                                 changed))))
+                      (writing-habit-table-remove-section-rows model)
+                    0)))
+    (writing-habit-table--apply model)
+    (message "Moved the activity into %d cell(s)%s" changed
+             (if (> removed 0) (format " and deleted %d section row(s)" removed) ""))
+    changed))
+
 ;;;; The legend
 
 (defun writing-habit-table--read-project (model)
-  "Read a code, a description, and a risk class for a new project in MODEL.
-Return (CODE DESCRIPTION RISK)."
+  "Read a code, a description, a risk class, and an activity for MODEL.
+Return (CODE DESCRIPTION RISK ACTIVITY)."
   (let* ((code (upcase (string-trim
                         (read-string "Project code: " (writing-habit-table-next-free-code model)))))
          (description (read-string (format "Description of %s (a due date may follow): " code)))
-         (tag (completing-read "Risk tag: " '("none" "safe" "risky") nil t nil nil "none")))
-    (list code description (pcase tag ("safe" "safe") ("risky" "speculative") (_ nil)))))
+         (tag (completing-read "Risk tag: " '("none" "safe" "risky") nil t nil nil "none"))
+         (activity (completing-read "Default activity: "
+                                    '("none" "generative" "editing" "support")
+                                    nil t nil nil "none")))
+    (list code description (pcase tag ("safe" "safe") ("risky" "speculative") (_ nil))
+          (car (member activity '("generative" "editing" "support"))))))
 
 (defun writing-habit-table--insert-project (above)
   "Insert a project into the legend ABOVE or below the entry at point.
@@ -401,7 +468,13 @@ Drop a blank row that this command added once its code leaves the grid."
       (let ((bounds (writing-habit-table--cell-bounds cell)))
         (when bounds
           (let ((beg (save-excursion (goto-char (car bounds))
-                                     (skip-chars-forward " " (cdr bounds)) (point)))
+                                     (skip-chars-forward " " (cdr bounds))
+                                     ;; An activity letter is not part of the
+                                     ;; code, so completion starts after it.
+                                     (when (let ((case-fold-search nil))
+                                             (looking-at "[ges][A-Z]\\|[ges][ \t]*|\\|[ges]\\'"))
+                                       (forward-char 1))
+                                     (point)))
                 (end (save-excursion (goto-char (cdr bounds))
                                      (skip-chars-backward " " (car bounds)) (point))))
             (list (min beg (point)) (max end (point))
@@ -421,11 +494,21 @@ Drop a blank row that this command added once its code leaves the grid."
       (let ((code (writing-habit-table-cell model row cell)))
         (unless (string-empty-p code)
           (let ((info (writing-habit-table-project-info model code)))
-            (if (null info)
-                (format "%s is not in the legend" (upcase code))
-              (concat (plist-get info :code) ": " (plist-get info :name)
-                      (if (plist-get info :due) (format ", due %s" (plist-get info :due)) "")
-                      (if (plist-get info :risk) (format ", %s" (plist-get info :risk)) "")))))))))
+            (let* ((block (seq-find (lambda (b) (and (= (writing-habit-table-block-row b) row)
+                                                     (= (writing-habit-table-block-column b) cell)))
+                                    (writing-habit-table-blocks model)))
+                   (activity (if block
+                                 (format ", %s (%s)" (writing-habit-table-block-category block)
+                                         (cdr (assq (writing-habit-table-block-activity-source block)
+                                                    writing-habit-table--source-labels)))
+                               "")))
+              (if (null info)
+                  (format "%s is not in the legend%s"
+                          (cdr (writing-habit-table-split-cell code)) activity)
+                (concat (plist-get info :code) ": " (plist-get info :name)
+                        (if (plist-get info :due) (format ", due %s" (plist-get info :due)) "")
+                        (if (plist-get info :risk) (format ", %s" (plist-get info :risk)) "")
+                        activity)))))))))
 
 ;;;; Tints
 
@@ -456,6 +539,19 @@ Skip the work when neither the text nor point moved, unless FORCE."
           (when (and model (writing-habit-table-columns model))
             (setq writing-habit-table--clash-count
                   (length (writing-habit-table-overlaps model)))
+            (when writing-habit-table-tint-activities
+              (save-excursion
+                (dolist (b (writing-habit-table-blocks model))
+                  (goto-char (point-min))
+                  (forward-line (+ offset (writing-habit-table-block-row b)))
+                  (let ((bounds (writing-habit-table--cell-bounds
+                                 (writing-habit-table-block-column b))))
+                    (when bounds
+                      (writing-habit-table--overlay
+                       (car bounds) (cdr bounds)
+                       (cdr (assoc (writing-habit-table-block-category b)
+                                   writing-habit-table--activity-faces))
+                       5))))))
             (save-excursion
               (dolist (rc (writing-habit-table-conflicting-cells model))
                 (goto-char (point-min))
@@ -522,6 +618,15 @@ Skip the work when neither the text nor point moved, unless FORCE."
              (format "\n\nSections that name no activity, counted as generative: %s"
                      (string-join unknown ", "))
            ""))
+       (let ((fallbacks (writing-habit-table-activity-fallbacks model)))
+         (if fallbacks
+             (concat "\n\nBlocks with no activity letter, no project default, and no section, counted as generative:\n"
+                     (mapconcat (lambda (b) (format "- %s-%s %s"
+                                                    (writing-habit-table-block-start b)
+                                                    (writing-habit-table-block-end b)
+                                                    (writing-habit-table-block-letter b)))
+                                fallbacks "\n"))
+           ""))
        "\n\n* Legend\n"
        (mapconcat (lambda (r) (format "- %s :: %s %s%s" (nth 0 r) (nth 4 r) (nth 2 r)
                                       (if (nth 3 r) (format " (%s)" (nth 3 r)) "")))
@@ -533,6 +638,24 @@ Skip the work when neither the text nor point moved, unless FORCE."
              (concat "\n\nCodes defined more than once (the first wins):\n"
                      (mapconcat (lambda (d) (format "- %s :: %s" (car d) (string-join (cdr d) " / ")))
                                 dups "\n"))
+           ""))
+       (let ((overrides (writing-habit-table-prefix-overrides model)))
+         (if overrides
+             (concat "\n\nCells whose activity letter overrides their section:\n"
+                     (mapconcat (lambda (b) (format "- %s-%s %s under %s counts as %s"
+                                                    (writing-habit-table-block-start b)
+                                                    (writing-habit-table-block-end b)
+                                                    (writing-habit-table-cell
+                                                     model (writing-habit-table-block-row b)
+                                                     (writing-habit-table-block-column b))
+                                                    (writing-habit-table-block-section b)
+                                                    (writing-habit-table-block-category b)))
+                                overrides "\n"))
+           ""))
+       (let ((defaults (writing-habit-table-legend-defaults model)))
+         (if defaults
+             (format "\n\nDefault activities: %s"
+                     (mapconcat (lambda (d) (format "%s %s" (car d) (cdr d))) defaults ", "))
            ""))
        (let ((stray (writing-habit-table-stray-risk-tags model)))
          (if stray
@@ -597,6 +720,7 @@ the wrong plan shape."
     ("p" "Insert project above" writing-habit-table-insert-project-above)
     ("P" "Insert project below" writing-habit-table-insert-project-below)
     ("D" "Delete project" writing-habit-table-delete-project)
+    ("m" "Move activities into cells" writing-habit-table-move-activities)
     ("s" "Sync legend with grid" writing-habit-table-update-legend)]
    ["Week"
     ("r" "Report" writing-habit-table-report)

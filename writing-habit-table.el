@@ -164,11 +164,52 @@ A range whose end is not after its start runs past midnight."
       (setq lines (butlast lines)))
     lines))
 
-(defun writing-habit-table--legend-text (code description risk)
-  "Return the first cell of a legend row for CODE, DESCRIPTION, and RISK."
+(defun writing-habit-table--legend-text (code description risk &optional activity)
+  "Return the first cell of a legend row for CODE, DESCRIPTION, and RISK.
+ACTIVITY, a default activity such as \"support\", is written before the
+risk tag, as in \"E: email @support :safe:\", because both readers
+expect the risk tag at the end of the cell."
   (let ((tag (cdr (assoc (or risk "") writing-habit-table-risk-to-tag))))
     (concat (string-trim-right (format "%s: %s" code (string-trim description)))
+            (if activity (format " @%s" activity) "")
             (if tag (format " :%s:" tag) ""))))
+
+;;;; Activity letters in the cells
+
+(defconst writing-habit-table-category-letter
+  '(("generative" . "g") ("editing" . "e") ("support" . "s"))
+  "The letter each activity contributes to a cell and to a schedule code.")
+
+(defconst writing-habit-table-letter-category
+  '(("g" . "generative") ("e" . "editing") ("s" . "support"))
+  "The activity each letter of a day cell names, as in gA.")
+
+(defconst writing-habit-table-category-section
+  '(("generative" . "Generative") ("editing" . "Rewriting") ("support" . "Supporting"))
+  "The section name the scheduler gives an activity named by a cell or a default.")
+
+(defconst writing-habit-table-cell-re
+  "\\`\\([ges]\\)\\([A-Z][A-Z0-9]\\{0,3\\}\\)\\'"
+  "A day cell with an activity letter before the code, such as gA or sEM.
+The letter counts only when it is lowercase and the code starts with a
+capital, so a cell typed all in lowercase is a code.  This is the rule of
+`writing-schedule-split-cell'.")
+
+(defun writing-habit-table-split-cell (text)
+  "Return (LETTER . CODE) for the day cell TEXT.
+LETTER is \"g\", \"e\", or \"s\" for a cell such as gA, and nil
+otherwise.  A cell without a letter is upper-cased whole."
+  (let ((text (string-trim (or text "")))
+        (case-fold-search nil))
+    (if (string-match writing-habit-table-cell-re text)
+        (cons (match-string 1 text) (match-string 2 text))
+      (cons nil (upcase text)))))
+
+(defun writing-habit-table-normalize-cell (text)
+  "Return what a cell holds for the typed TEXT.
+A valid activity letter is kept and the code is raised to capitals."
+  (let ((split (writing-habit-table-split-cell text)))
+    (if (string-empty-p (cdr split)) "" (concat (or (car split) "") (cdr split)))))
 
 ;;;; Data
 
@@ -191,12 +232,36 @@ added, the only rows it ever drops again."
 (cl-defstruct (writing-habit-table-block
                (:constructor writing-habit-table-block-create)
                (:copier nil))
-  "One filled cell of a block row, which is one planned writing block."
-  offset start end letter section row column)
+  "One filled cell of a block row, which is one planned writing block.
+LETTER is the code without any activity letter.  CELL-ACTIVITY is the
+activity the cell names, LEGEND-ACTIVITY the default of the code's legend
+entry, and HEADED is non-nil when a section header precedes the row."
+  offset start end letter section row column cell-activity legend-activity
+  (headed t))
 
 (defun writing-habit-table-block-category (block)
-  "Return the activity category of BLOCK."
-  (writing-habit-table--category (writing-habit-table-block-section block)))
+  "Return the activity category of BLOCK.
+It comes from the first of these that is present: an activity letter in
+the cell, a default activity on the code's legend entry, the section
+header above the row, and finally the generative default.  The scheduler
+applies the same rule."
+  (or (writing-habit-table-block-cell-activity block)
+      (writing-habit-table-block-legend-activity block)
+      (writing-habit-table--category (writing-habit-table-block-section block))))
+
+(defun writing-habit-table-block-activity-source (block)
+  "Return where BLOCK's activity came from: cell, legend, section, or none."
+  (cond ((writing-habit-table-block-cell-activity block) 'cell)
+        ((writing-habit-table-block-legend-activity block) 'legend)
+        ((writing-habit-table-block-headed block) 'section)
+        (t 'none)))
+
+(defun writing-habit-table-block-event-section (block)
+  "Return the section name the scheduler gives BLOCK."
+  (if (memq (writing-habit-table-block-activity-source block) '(cell legend))
+      (cdr (assoc (writing-habit-table-block-category block)
+                  writing-habit-table-category-section))
+    (writing-habit-table-block-section block)))
 
 (defun writing-habit-table-block-minutes (block)
   "Return the planned minutes of BLOCK."
@@ -386,30 +451,40 @@ A value too long for its slot widens that slot alone."
 
 (defun writing-habit-table-blocks (table)
   "Return every filled block of TABLE, in file order."
-  (let ((out '()) (row-index -1))
+  (let ((out '()) (row-index -1) (headed nil)
+        (defaults (writing-habit-table-legend-defaults table)))
     (dolist (row (writing-habit-table-rows table))
       (setq row-index (1+ row-index))
+      (when (eq (writing-habit-table-row-kind row) 'section)
+        (setq headed t))
       (when (eq (writing-habit-table-row-kind row) 'block)
         (let ((times (writing-habit-table-row-parsed row)))
           (dolist (col (writing-habit-table-columns table))
             (let ((text (writing-habit-table-cell table row-index (car col))))
               (unless (string-empty-p text)
-                (push (writing-habit-table-block-create
-                       :offset (nth 1 col) :start (car times) :end (cdr times)
-                       :letter (upcase text)
-                       :section (writing-habit-table-row-section row)
-                       :row row-index :column (car col))
-                      out)))))))
+                (let ((split (writing-habit-table-split-cell text)))
+                  (push (writing-habit-table-block-create
+                         :offset (nth 1 col) :start (car times) :end (cdr times)
+                         :letter (cdr split)
+                         :section (writing-habit-table-row-section row)
+                         :row row-index :column (car col)
+                         :cell-activity (cdr (assoc (car split)
+                                                    writing-habit-table-letter-category))
+                         :legend-activity (cdr (assoc (cdr split) defaults))
+                         :headed headed)
+                        out))))))))
     (nreverse out)))
 
 (defun writing-habit-table-events (table)
   "Return TABLE's blocks as scheduler event plists, for its overlap check."
   (mapcar (lambda (b)
-            (list :section (writing-habit-table-block-section b)
+            (list :section (writing-habit-table-block-event-section b)
                   :offset (writing-habit-table-block-offset b)
                   :start (writing-habit-table-block-start b)
                   :end (writing-habit-table-block-end b)
-                  :letter (writing-habit-table-block-letter b)))
+                  :letter (writing-habit-table-block-letter b)
+                  :activity (cdr (assoc (writing-habit-table-block-cell-activity b)
+                                        writing-habit-table-category-letter))))
           (writing-habit-table-blocks table)))
 
 (defun writing-habit-table-legend (table)
@@ -421,6 +496,37 @@ A code defined twice keeps its first definition, as the readers do."
         (let ((parsed (writing-habit-table-row-parsed row)))
           (unless (assoc (car parsed) out) (push parsed out)))))
     (nreverse out)))
+
+(defun writing-habit-table-legend-defaults (table)
+  "Return TABLE's default activities as an alist of (CODE . ACTIVITY).
+A code defined twice takes the activity of its first definition."
+  (let ((out '()) (seen '()))
+    (dolist (row (writing-habit-table-rows table))
+      (when (eq (writing-habit-table-row-kind row) 'legend)
+        (let ((code (car (writing-habit-table-row-parsed row))))
+          (unless (member code seen)
+            (push code seen)
+            (let ((activity (writing-habit-name-legend-activity
+                             (or (car (writing-habit-table-row-cells row)) ""))))
+              (when activity (push (cons code activity) out)))))))
+    (nreverse out)))
+
+(defun writing-habit-table-activity-fallbacks (table)
+  "Return the blocks of TABLE whose activity fell through to generative.
+Such a block has no activity letter, no legend default, and no section
+header above it."
+  (seq-filter (lambda (b) (eq (writing-habit-table-block-activity-source b) 'none))
+              (writing-habit-table-blocks table)))
+
+(defun writing-habit-table-prefix-overrides (table)
+  "Return the blocks of TABLE whose activity letter differs from their section."
+  (seq-filter (lambda (b)
+                (and (eq (writing-habit-table-block-activity-source b) 'cell)
+                     (writing-habit-table-block-headed b)
+                     (not (equal (writing-habit-table--category
+                                  (writing-habit-table-block-section b))
+                                 (writing-habit-table-block-cell-activity b)))))
+              (writing-habit-table-blocks table)))
 
 (defun writing-habit-table-used-codes (table)
   "Return the codes used in the grid of TABLE, in first-appearance order."
@@ -434,12 +540,13 @@ A code defined twice keeps its first definition, as the readers do."
 (defun writing-habit-table-project-info (table code)
   "Return a plist (:code :name :due :risk) for CODE in TABLE, or nil.
 This is what a cell explains about itself when point rests on it."
-  (let* ((code (upcase (string-trim code)))
+  (let* ((code (cdr (writing-habit-table-split-cell code)))
          (entry (cdr (assoc code (writing-habit-table-legend table)))))
     (when entry
       (let ((split (writing-habit-table-split-due-date (car entry))))
         (list :code code :name (car split) :due (cdr split)
-              :risk (cdr (assoc (or (cadr entry) "") writing-habit-table-risk-label)))))))
+              :risk (cdr (assoc (or (cadr entry) "") writing-habit-table-risk-label))
+              :activity (cdr (assoc code (writing-habit-table-legend-defaults table))))))))
 
 ;;;; Editing cells and the legend
 
@@ -447,7 +554,7 @@ This is what a cell explains about itself when point rests on it."
   "Set cell COLUMN-INDEX of block row ROW-INDEX in TABLE to VALUE.
 Return non-nil when anything changed.  Only that one line is rewritten."
   (let ((row (writing-habit-table-row-at table row-index))
-        (value (upcase (string-trim value))))
+        (value (writing-habit-table-normalize-cell value)))
     (unless (and row (eq (writing-habit-table-row-kind row) 'block))
       (error "Only a time-block row holds project codes"))
     (let ((cells (writing-habit-table-row-cells row)))
@@ -461,15 +568,22 @@ Return non-nil when anything changed.  Only that one line is rewritten."
         (setf (writing-habit-table-dirty table) t)
         t))))
 
-(defun writing-habit-table-set-legend (table row-index code description risk)
+(defun writing-habit-table-set-legend (table row-index code description risk
+                                             &optional activity)
   "Rewrite legend row ROW-INDEX of TABLE with CODE, DESCRIPTION, and RISK.
-RISK is a class name, \"safe\" or \"speculative\", or nil.  Return
-non-nil when anything changed."
+RISK is a class name, \"safe\" or \"speculative\", or nil.  ACTIVITY
+is a default activity such as \"support\", the symbol `none' to remove
+it, or nil to keep the one the row names, so an edit of the description
+never drops it.  Return non-nil when anything changed."
   (let ((row (writing-habit-table-row-at table row-index)))
     (unless (and row (eq (writing-habit-table-row-kind row) 'legend))
       (error "Not a legend row"))
     (let ((text (writing-habit-table--legend-text
-                 (upcase (string-trim code)) description risk)))
+                 (upcase (string-trim code)) description risk
+                 (cond ((eq activity 'none) nil)
+                       (activity)
+                       (t (writing-habit-name-legend-activity
+                           (or (car (writing-habit-table-row-cells row)) "")))))))
       (unless (equal (car (writing-habit-table-row-cells row)) text)
         (if (writing-habit-table-row-cells row)
             (setf (car (writing-habit-table-row-cells row)) text)
@@ -479,13 +593,13 @@ non-nil when anything changed."
               (writing-habit-table-dirty table) t)
         t))))
 
-(defun writing-habit-table-add-legend (table code &optional description risk)
+(defun writing-habit-table-add-legend (table code &optional description risk activity)
   "Add a legend row for CODE to TABLE and return its index.
 The new line copies the shape of the last legend row, so the column
 widths survive.  A table with no legend yet gets a line as wide as its
 header."
   (let* ((text (writing-habit-table--legend-text
-                (upcase (string-trim code)) (or description "") risk))
+                (upcase (string-trim code)) (or description "") risk activity))
          (existing (writing-habit-table-legend-rows table))
          cells raw at)
     (if existing
@@ -525,7 +639,7 @@ one of the 702 codes is taken."
         "")))
 
 (defun writing-habit-table-insert-legend (table near above code
-                                                &optional description risk)
+                                                &optional description risk activity)
   "Insert a legend row for CODE beside legend row NEAR of TABLE.
 ABOVE non-nil puts it before NEAR.  NEAR nil puts it at the end of the
 legend, or starts a legend.  Return the new row's index.  Signal an error
@@ -541,8 +655,8 @@ already defines, because the readers keep the first definition."
     (when (and near (not (memq near existing)))
       (error "Not a legend row"))
     (if (null near)
-        (writing-habit-table-add-legend table code description risk)
-      (let* ((text (writing-habit-table--legend-text code (or description "") risk))
+        (writing-habit-table-add-legend table code description risk activity)
+      (let* ((text (writing-habit-table--legend-text code (or description "") risk activity))
              (model (writing-habit-table-row-at table near))
              (cells (make-list (max (length (writing-habit-table-row-cells model)) 1) ""))
              (at (if above near (1+ near))))
@@ -574,7 +688,7 @@ the writer's deletion as its own row to drop."
 
 (defun writing-habit-table-cells-using (table code)
   "Return how many grid cells of TABLE hold CODE."
-  (let ((code (upcase (string-trim code))))
+  (let ((code (cdr (writing-habit-table-split-cell code))))
     (seq-count (lambda (b) (equal (writing-habit-table-block-letter b) code))
                (writing-habit-table-blocks table))))
 
@@ -775,6 +889,39 @@ not touched here."
     (setf (writing-habit-table-dirty table) t)
     row))
 
+;;;; Moving the activity into the cells
+
+(defun writing-habit-table-move-activities-into-cells (table)
+  "Write the section's activity letter into every bare cell of TABLE under it.
+Only a cell whose activity comes from its section header gains a letter.
+A cell that has one keeps it, and a cell whose project names a default
+activity is left bare, because that default still applies once the
+headers are gone.  Return the number of cells changed."
+  (let ((changed 0))
+    (dolist (b (writing-habit-table-blocks table))
+      (when (eq (writing-habit-table-block-activity-source b) 'section)
+        (when (writing-habit-table-set-cell
+               table (writing-habit-table-block-row b) (writing-habit-table-block-column b)
+               (concat (cdr (assoc (writing-habit-table-block-category b)
+                                   writing-habit-table-category-letter))
+                       (writing-habit-table-block-letter b)))
+          (setq changed (1+ changed)))))
+    changed))
+
+(defun writing-habit-table-remove-section-rows (table)
+  "Delete every section header row of TABLE and return how many went.
+Call this after `writing-habit-table-move-activities-into-cells', so no
+block loses its activity."
+  (let* ((before (length (writing-habit-table-rows table))))
+    (setf (writing-habit-table-rows table)
+          (seq-remove (lambda (r) (eq (writing-habit-table-row-kind r) 'section))
+                      (writing-habit-table-rows table)))
+    (let ((removed (- before (length (writing-habit-table-rows table)))))
+      (when (> removed 0)
+        (writing-habit-table--resection table)
+        (setf (writing-habit-table-dirty table) t))
+      removed)))
+
 ;;;; Moving legend rows
 
 (defun writing-habit-table-legend-move-target (table row-index up)
@@ -839,7 +986,7 @@ row itself is left out."
                                          (writing-habit-table-block-start b)
                                          (writing-habit-table-block-end b)
                                          (writing-habit-table-block-letter b)
-                                         (writing-habit-table-block-section b))
+                                         (writing-habit-table-block-event-section b))
                                    ids)
                        (cons (writing-habit-table-block-row b)
                              (writing-habit-table-block-column b))))

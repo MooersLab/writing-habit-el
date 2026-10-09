@@ -569,7 +569,8 @@ BODY runs with `example' bound to the named example week."
                 (concat "| Time | M |\n|------+---|\n| 09:00-10:00 | A |\n|-\n"
                         "| A: 1003molGraphicsR01, Sept 25 :risky: | |\n"))))
     (should (equal (writing-habit-table-project-info table "a")
-                   '(:code "A" :name "1003molGraphicsR01" :due "Sept 25" :risk "risky")))
+                   '(:code "A" :name "1003molGraphicsR01" :due "Sept 25" :risk "risky"
+                     :activity nil)))
     (should-not (writing-habit-table-project-info table "Z"))))
 
 ;;;; Deleting rows and two-letter codes
@@ -676,6 +677,145 @@ BODY runs with `example' bound to the named example week."
                                       :events))
                    '("AB")))
     (should-not (car (writing-habit-table-code-or-problem table)))))
+
+;;;; Activity letters in cells and legend default activities
+
+(defconst writing-habit-table-tests--free
+  (concat "| Time        | M  | Tu | W  |\n"
+          "|-------------+----+----+----|\n"
+          "| 12:15-13:00 | sE | E  | sE |\n"
+          "| 17:30-19:00 | eB | eA |    |\n"
+          "| 21:00-23:30 | gA | gB | B  |\n"
+          "|-------------+----+----+----|\n"
+          "| A: DNPH1 docking :safe: |  |  |  |\n"
+          "| B: DUSP1 radiation |  |  |  |\n"
+          "| E: email @support |  |  |  |\n")
+  "A week with activity letters and no section headers.")
+
+(defun writing-habit-table-tests--sections-by (events)
+  "Return ((OFFSET START LETTER) . SECTION) for scheduler EVENTS."
+  (sort (mapcar (lambda (e) (cons (list (plist-get e :offset) (plist-get e :start)
+                                        (plist-get e :letter))
+                                  (plist-get e :section)))
+                events)
+        (lambda (a b) (string< (format "%S" a) (format "%S" b)))))
+
+(writing-habit-table-tests--deftest split-cell-matches-the-scheduler
+  "The cell rule of the editor is the scheduler's rule."
+  (dolist (cell '("gA" "eEM" "sW2" "A" "ga" "gem" " sE " "xA" "" "Zebra" "q"))
+    (should (equal (writing-habit-table-split-cell cell)
+                   (writing-schedule-split-cell cell)))))
+
+(writing-habit-table-tests--deftest normalize-cell
+  "A cell keeps a valid letter and raises the code."
+  (dolist (case '(("gA" . "gA") ("ea" . "EA") ("a" . "A") (" sEM " . "sEM") ("" . "")))
+    (should (equal (writing-habit-table-normalize-cell (car case)) (cdr case))))
+  (let ((row (car (writing-habit-table-block-rows example))))
+    (writing-habit-table-set-cell example row 1 "eA")
+    (should (equal (writing-habit-table-cell example row 1) "eA"))))
+
+(writing-habit-table-tests--deftest prefix-beats-the-section
+  "A cell letter sets the activity of its block."
+  (let ((row (car (writing-habit-table-block-rows example))))
+    (writing-habit-table-set-cell example row 1 "eA")
+    (let ((b (seq-find (lambda (b) (and (= (writing-habit-table-block-row b) row)
+                                        (= (writing-habit-table-block-column b) 1)))
+                       (writing-habit-table-blocks example))))
+      (should (equal (writing-habit-table-block-letter b) "A"))
+      (should (equal (writing-habit-table-block-category b) "editing"))
+      (should (eq (writing-habit-table-block-activity-source b) 'cell))
+      (should (equal (writing-habit-table-block-event-section b) "Rewriting")))))
+
+(writing-habit-table-tests--deftest legend-default-beats-the-section
+  "A default activity on the legend entry applies to the bare cells."
+  (let ((e-row (car (last (writing-habit-table-legend-rows example)))))
+    (writing-habit-table-set-legend example e-row "E" "email" nil "editing")
+    (dolist (b (writing-habit-table-blocks example))
+      (when (equal (writing-habit-table-block-letter b) "E")
+        (should (equal (writing-habit-table-block-category b) "editing"))
+        (should (eq (writing-habit-table-block-activity-source b) 'legend))))))
+
+(writing-habit-table-tests--deftest editor-and-scheduler-agree
+  "The editor's events match the scheduler's, with and without headers."
+  (let ((free (writing-habit-table-from-text writing-habit-table-tests--free)))
+    (should (equal (writing-habit-table-tests--sections-by (writing-habit-table-events free))
+                   (writing-habit-table-tests--sections-by
+                    (plist-get (writing-schedule-parse-text
+                                (writing-habit-table-to-text free))
+                               :events)))))
+  (writing-habit-table-set-cell example (car (writing-habit-table-block-rows example)) 2 "sB")
+  (writing-habit-table-set-legend example (nth 3 (writing-habit-table-legend-rows example))
+                                  "T" "teaching" nil "support")
+  (should (equal (writing-habit-table-tests--sections-by (writing-habit-table-events example))
+                 (writing-habit-table-tests--sections-by
+                  (plist-get (writing-schedule-parse-text
+                              (writing-habit-table-to-text example))
+                             :events)))))
+
+(writing-habit-table-tests--deftest activity-totals-name-and-fallbacks
+  "Totals, the canonical name, and the fallbacks follow the resolved activity."
+  (let ((free (writing-habit-table-from-text writing-habit-table-tests--free)))
+    (should (equal (sort (copy-sequence (plist-get (writing-habit-table-totals free) :category))
+                         (lambda (a b) (string< (car a) (car b))))
+                   '(("editing" . 180) ("generative" . 450) ("support" . 135))))
+    (should (equal (writing-habit-table-code free) "sEeBgA-sEeAgB-sEgB"))
+    (should (equal (mapcar #'writing-habit-table-block-letter
+                           (writing-habit-table-activity-fallbacks free))
+                   '("B")))
+    (should (equal (writing-habit-table-used-codes free) '("E" "B" "A")))
+    (should (= (writing-habit-table-cells-using free "gA") 2))
+    (should (equal (plist-get (writing-habit-table-project-info free "sE") :activity)
+                   "support"))))
+
+(writing-habit-table-tests--deftest prefix-overrides-are-listed
+  "Only a letter that disagrees with its section is an override."
+  (let ((rows (writing-habit-table-block-rows example)))
+    (writing-habit-table-set-cell example (nth 0 rows) 1 "eA")
+    (writing-habit-table-set-cell example (nth 1 rows) 1 "gA")
+    (should (equal (mapcar (lambda (b) (cons (writing-habit-table-block-row b)
+                                             (writing-habit-table-block-column b)))
+                           (writing-habit-table-prefix-overrides example))
+                   (list (cons (nth 0 rows) 1))))))
+
+(writing-habit-table-tests--deftest legend-activity-tags
+  "The name module strips the tag, and set-legend keeps or removes it."
+  (should (equal (writing-habit-name-parse-legend-cell "E: email @support :safe:")
+                 '("E" "email" "safe")))
+  (should (equal (writing-habit-name-parse-legend-cell "E: email :safe: @support")
+                 '("E" "email" "safe")))
+  (should (equal (writing-habit-name-legend-activity "E: email @Support") "support"))
+  (should-not (writing-habit-name-legend-activity "E: me@support.org"))
+  (let* ((free (writing-habit-table-from-text writing-habit-table-tests--free))
+         (row (nth 2 (writing-habit-table-legend-rows free))))
+    (writing-habit-table-set-legend free row "E" "inbox" "safe")
+    (should (equal (car (writing-habit-table-row-cells (writing-habit-table-row-at free row)))
+                   "E: inbox @support :safe:"))
+    (writing-habit-table-set-legend free row "E" "inbox" "safe" 'none)
+    (should (equal (car (writing-habit-table-row-cells (writing-habit-table-row-at free row)))
+                   "E: inbox :safe:"))
+    (let ((at (writing-habit-table-insert-legend free nil nil "T" "teaching" nil "support")))
+      (should (equal (car (writing-habit-table-row-cells (writing-habit-table-row-at free at)))
+                     "T: teaching @support")))))
+
+(writing-habit-table-tests--deftest move-activities-into-cells
+  "Section letters move into the cells, and the headers can then go."
+  (let ((categories (lambda (tb) (mapcar (lambda (b) (list (writing-habit-table-block-offset b)
+                                                           (writing-habit-table-block-start b)
+                                                           (writing-habit-table-block-category b)))
+                                         (writing-habit-table-blocks tb))))
+        (rows (writing-habit-table-block-rows example)))
+    (let ((before (funcall categories example))
+          (code (writing-habit-table-code example)))
+      (should (= (writing-habit-table-move-activities-into-cells example) 22))
+      (should (equal (writing-habit-table-cell example (nth 0 rows) 1) "gA"))
+      (should (equal (writing-habit-table-cell example (nth 2 rows) 1) "eB"))
+      (should (equal (writing-habit-table-cell example (nth 3 rows) 1) "sE"))
+      (should (equal (funcall categories example) before))
+      (should (= (writing-habit-table-remove-section-rows example) 3))
+      (should-not (writing-habit-table--indexes example '(section)))
+      (should (equal (funcall categories example) before))
+      (should (equal (writing-habit-table-code example) code))
+      (should (= (writing-habit-table-move-activities-into-cells example) 0)))))
 
 (provide 'writing-habit-table-tests)
 ;;; writing-habit-table-tests.el ends here

@@ -76,6 +76,33 @@
   "\\`\\([A-Z][A-Z0-9]\\{0,3\\}\\)[ \t]*:[ \t]*\\(.*\\)\\'"
   "Match a legend cell: an uppercase code, a colon, then a description.")
 
+(defconst writing-habit-name--activity-re
+  "\\(?:\\`\\|[ \t]\\)@\\(generative\\|editing\\|support\\)\\b"
+  "Match a default activity tag in a legend description, such as @support.")
+
+(defun writing-habit-name-split-legend-activity (desc)
+  "Return (DESCRIPTION . ACTIVITY) for the legend description DESC.
+The first tag such as @support is removed from DESCRIPTION, and ACTIVITY
+is \"generative\", \"editing\", or \"support\", or nil when DESC has
+no tag.  The scheduler reads the same tag, so a bare code in a cell takes
+this activity when the cell carries no activity letter of its own."
+  (let ((case-fold-search t)
+        (desc (or desc "")))
+    (if (string-match writing-habit-name--activity-re desc)
+        (let* ((activity (downcase (match-string 1 desc)))
+               (rest (string-trim (concat (substring desc 0 (match-beginning 0))
+                                          (substring desc (match-end 0))))))
+          (cons (replace-regexp-in-string "[ \t]\\{2,\\}" " " rest) activity))
+      (cons desc nil))))
+
+(defun writing-habit-name-legend-activity (cell)
+  "Return the default activity named in the legend CELL, or nil."
+  (let ((cell (string-trim (or cell ""))))
+    (when (let ((case-fold-search nil))
+            (string-match writing-habit-name--legend-re cell))
+      (cdr (writing-habit-name-split-legend-activity
+            (string-trim (match-string 2 cell)))))))
+
 (defconst writing-habit-name--risk-re
   "\\(?:(\\(safe\\|risky\\|support\\))\\|:\\(safe\\|risky\\|support\\):\\)[ \t]*\\'"
   "Match a trailing risk tag in either the (safe) or :safe: form.")
@@ -251,13 +278,16 @@ example \"A: DNPH1 docking :safe:\".  A trailing risk tag in either the
 name a class, safe and risky, and risky names the class the database
 calls speculative, so RISK is \"safe\", \"speculative\", or nil.  A legacy
 support tag is stripped and names nothing, because support is an
-activity.  Callers that hold a table in memory, such as the table editor,
-use this so one rule governs both the reader and the editor."
+activity.  A default activity tag such as @support is stripped too; read
+it with `writing-habit-name-legend-activity'.  Callers that hold a table
+in memory, such as the table editor, use this so one rule governs both
+the reader and the editor."
   (let ((cell (string-trim cell)))
     (when (let ((case-fold-search nil))
             (string-match writing-habit-name--legend-re cell))
       (let ((code (match-string 1 cell))
-            (desc (string-trim (match-string 2 cell)))
+            (desc (car (writing-habit-name-split-legend-activity
+                        (string-trim (match-string 2 cell)))))
             (risk nil))
         (let ((case-fold-search t))
           (when (string-match writing-habit-name--risk-re desc)
