@@ -206,7 +206,7 @@ otherwise.  A cell without a letter is upper-cased whole."
       (cons nil (upcase text)))))
 
 (defun writing-habit-table-normalize-cell (text)
-  "Return what a cell holds for the typed TEXT.
+  "Return the text a cell should hold for the typed TEXT.
 A valid activity letter is kept and the code is raised to capitals."
   (let ((split (writing-habit-table-split-cell text)))
     (if (string-empty-p (cdr split)) "" (concat (or (car split) "") (cdr split)))))

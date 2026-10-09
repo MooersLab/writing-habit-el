@@ -172,7 +172,8 @@ cross-port fixture failed on whichever machine did not write it."
   (number-to-string (cdr (assoc key row))))
 
 (defun writing-habit-dashboard--schedule-rows (db week-start)
-  "Return the planned blocks for WEEK-START as (offset start end code activity)."
+  "Return the planned blocks in DB for WEEK-START.
+Each row is (offset start end code activity)."
   (sqlite-select
    db (concat "SELECT CAST(julianday(b.day) - julianday(b.week_start) AS INTEGER) AS offset,"
               " b.start_time, b.end_time, p.code, c.name AS activity"
@@ -432,7 +433,7 @@ cross-port fixture failed on whichever machine did not write it."
 ;;;; Assembly
 
 (defun writing-habit-dashboard-html (db week)
-  "Return a self-contained HTML dashboard string for the week containing WEEK."
+  "Return a self-contained HTML dashboard from DB for the week containing WEEK."
   (let* ((week-start (writing-habit-compare--monday week))
          (proj (writing-habit-compare-week-project db week))
          (cat (writing-habit-compare-week-category db week))

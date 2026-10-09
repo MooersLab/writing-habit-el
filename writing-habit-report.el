@@ -119,7 +119,7 @@ Org mode."
   (concat "[" (mapconcat #'number-to-string items ", ") "]"))
 
 (defun writing-habit-report--plot-python (proj week out-path)
-  "Return a matplotlib script that plots PROJ for WEEK and saves it to OUT-PATH.
+  "Return a matplotlib script that plots PROJ for WEEK and save it to OUT-PATH.
 This mirrors compare/report.py's write_plot: a grouped bar chart of planned
 against actual minutes per project, in Agg mode so it needs no display."
   (let ((codes (mapcar (lambda (r) (cdr (assoc "code" r))) proj))
@@ -146,7 +146,7 @@ against actual minutes per project, in Agg mode so it needs no display."
      "plt.close(fig)\n")))
 
 (defun writing-habit-report--plot-src-block (proj week out-path)
-  "Return an Org Babel python source block that renders the plot to OUT-PATH."
+  "Return an Org Babel python block that renders PROJ for WEEK to OUT-PATH."
   (concat
    "#+CAPTION: Planned versus actual minutes per project.\n"
    (format "#+begin_src python :results file graphics :file %s :exports results\n"
@@ -180,7 +180,7 @@ Python fails."
 ;;;; Rendering
 
 (defun writing-habit-report-week-string (db week &optional plot-file)
-  "Return an org-mode report of planned versus actual effort for WEEK from DB.
+  "Return an `org-mode' report of planned versus actual effort for WEEK from DB.
 When PLOT-FILE is non-nil, append a section with an Org Babel python source
 block that renders a planned-versus-actual bar chart to PLOT-FILE.  The
 block is not run at render time; C-c C-c on it, or an export, produces the

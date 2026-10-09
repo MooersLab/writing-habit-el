@@ -45,9 +45,9 @@
 (declare-function org-read-date "org" (&rest args))
 
 (defun writing-habit-seasons--section (title subtitle label-head rows label-key empty)
-  "Return the lines for one grouping table.
-ROWS are view rows, LABEL-KEY names the group column, and EMPTY is the message
-shown when there are no rows."
+  "Return the lines for one grouping table headed TITLE and SUBTITLE.
+ROWS are view rows, LABEL-HEAD heads the group column, LABEL-KEY names the
+group column in ROWS, and EMPTY is the message shown when there are no rows."
   (if (null rows)
       (list (concat "  <h2>" (writing-habit-dashboard--esc title) "</h2>")
             (concat "  <p class=\"sub\">" (writing-habit-dashboard--esc empty) "</p>"))

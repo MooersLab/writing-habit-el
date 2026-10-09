@@ -50,7 +50,7 @@
    (list (writing-habit-compare--monday week) tag note)))
 
 (defun writing-habit-context-clear (db week &optional tag)
-  "Remove TAG from the week containing WEEK, or every tag when TAG is nil.
+  "Remove TAG in DB from the week containing WEEK, or every tag when TAG is nil.
 Return the number of rows removed."
   (let ((monday (writing-habit-compare--monday week)))
     (if tag
