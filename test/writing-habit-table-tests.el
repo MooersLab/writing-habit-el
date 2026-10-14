@@ -129,7 +129,7 @@ BODY runs with `example' bound to the named example week."
          (result (writing-habit-table-code-or-problem table)))
     (should-not (car result))
     (should (string-match-p "EM" (cdr result)))
-    (should (string-match-p "single-letter alias" (cdr result)))))
+    (should (string-match-p "one-character alias" (cdr result)))))
 
 (writing-habit-table-tests--deftest totals
   "Totals by day, project, and activity agree with each other."
@@ -648,16 +648,21 @@ BODY runs with `example' bound to the named example week."
   (should-not (member "Q" (writing-habit-table-synced-codes example))))
 
 (writing-habit-table-tests--deftest project-codes-run-from-a-to-zz
-  "The single letters come first and the two-letter codes follow."
-  (should (equal (seq-take writing-habit-table-project-codes 28)
-                 (append (mapcar #'char-to-string (number-sequence ?A ?Z)) '("AA" "AB"))))
+  "The single letters come first, then the digits, then the two-letter codes."
+  (should (equal (seq-take writing-habit-table-project-codes 38)
+                 (append (mapcar #'char-to-string (number-sequence ?A ?Z))
+                         (mapcar #'char-to-string (number-sequence ?0 ?9))
+                         '("AA" "AB"))))
   (should (equal (car (last writing-habit-table-project-codes)) "ZZ"))
-  (should (= (length (delete-dups (copy-sequence writing-habit-table-project-codes))) 702)))
+  (should (= (length (delete-dups (copy-sequence writing-habit-table-project-codes))) 712)))
 
 (writing-habit-table-tests--deftest next-free-code-follows-z-with-aa
-  "Once A to Z are taken the next free code is AA, then AB."
+  "Once A to Z are taken the next free code is 0, and after 9 it is AA, then AB."
   (let ((table (writing-habit-table-tests--full-legend)))
     (should (= (length (writing-habit-table-legend table)) 26))
+    (should (equal (writing-habit-table-next-free-code table) "0"))
+    (dolist (digit (number-sequence ?0 ?9))
+      (writing-habit-table-insert-legend table nil nil (char-to-string digit) "x"))
     (should (equal (writing-habit-table-next-free-code table) "AA"))
     (writing-habit-table-insert-legend table nil nil "AA" "a 27th project")
     (should (equal (writing-habit-table-next-free-code table) "AB"))

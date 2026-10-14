@@ -49,7 +49,7 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 
 - GNU Emacs 29.1 or newer, built with SQLite support. The package checks `sqlite-available-p` and reports a clear message when SQLite is missing.
 - `transient` 0.4 or newer, which ships with Emacs 28 and later.
-- `writing-schedule.el` 0.3.1 or newer, for `plan import`, the table editing mode, and the scheduler groups of the menu. The tracker commands load it lazily, so they still run without it.
+- `writing-schedule.el` 0.3.1 or newer (0.5.0 or newer to read the digit project codes 0 to 9), for `plan import`, the table editing mode, and the scheduler groups of the menu. The tracker commands load it lazily, so they still run without it.
 - Optional: `python3` with `matplotlib`, needed only for the comparison plot. The HTML dashboard is pure Emacs Lisp and needs no Python.
 
 ## Installation
@@ -112,7 +112,7 @@ writing-habit   database: ~/habit.db
 
 ## Editing the weekly table
 
-An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. A lowercase letter before a code, as in `eA`, sets the activity of that block, and a legend tag such as `E: email @support` sets a project's default; each filled cell is tinted by its activity. Clash cells turn red, and with point in the Time column of a block, every block whose range does not overlap it turns yellow. Completion in a day cell offers the legend codes, and the echo area names the project, due date, and risk of the code at point. `M-<up>` and `M-<down>` move a block or a legend entry, and `C-c C-;` opens a menu that inserts blocks with a suggested time range, deletes a block or a legend entry, moves the section activities into the cells, inserts projects with the next free code (a single letter, then `AA`, `AB`, and so on once A to Z are taken, so the legend can hold more than 26 projects), renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
+An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. A lowercase letter before a code, as in `eA`, sets the activity of that block, and a legend tag such as `E: email @support` sets a project's default; each filled cell is tinted by its activity. Clash cells turn red, and with point in the Time column of a block, every block whose range does not overlap it turns yellow. Completion in a day cell offers the legend codes, and the echo area names the project, due date, and risk of the code at point. `M-<up>` and `M-<down>` move a block or a legend entry, and `C-c C-;` opens a menu that inserts blocks with a suggested time range, deletes a block or a legend entry, moves the section activities into the cells, inserts projects with the next free code (a single letter, then a digit `0` to `9`, then `AA`, `AB`, and so on, so the legend can hold 712 projects) and asks for each project's name and `YYYY-MM-DD` deadline, sorts the legend by project number, splits old descriptions into a project and a deadline, copies a project from the semester lists that follow the weekly table into this week's legend, marks a current-semester project completed, renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
 
 ## Command reference
 
@@ -125,6 +125,7 @@ An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `wri
 | `writing-habit-track-import-csv-file` | Import the tracking CSV |
 | `writing-habit-track-import-ics-file` | Import an actuals calendar |
 | `writing-habit-track-harvest-clock-file` | Harvest completed org-clock entries |
+| `writing-habit-track-sync-mytime-file` | Copy timed sessions from a mytime.db time-tracking database |
 | `writing-habit-report-week` | Show the weekly comparison as an org buffer |
 | `writing-habit-dashboard` | Write and open the HTML dashboard |
 | `writing-habit-seasons` | Write and open the seasons dashboard, grouped by month, context, and schedule |
@@ -146,6 +147,8 @@ emacs --batch -l writing-habit -f writing-habit-batch \
       track import actuals.csv --format csv --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch \
       track import actuals.ics --format ics --db habit.db
+emacs --batch -l writing-habit -f writing-habit-batch \
+      track sync ~/6003TimeTracking/cb/mytime.db --db habit.db --dry-run
 emacs --batch -l writing-habit -f writing-habit-batch \
       track add --day 2026-01-19 --project A --minutes 75 --category generative --db habit.db
 emacs --batch -l writing-habit -f writing-habit-batch compare --week 2026-01-19 --db habit.db
@@ -178,6 +181,8 @@ CLOCK: [2026-01-19 Mon 04:00]--[2026-01-19 Mon 05:30] =>  1:30
 
 The harvest is idempotent, so running it again over the same clocks inserts nothing new.
 
+To bring in sessions from a mytime.db time-tracking database, run `M-x writing-habit-track-sync-mytime-file`, or `track sync` from a shell. The legend of each week maps the tracker's four-digit project numbers to codes, and a rerun updates rows instead of duplicating them. See `docs/tracking-formats.md`.
+
 ## Marking safe and speculative projects
 
 To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. The two tags are `:safe:` and `:risky:`, and `:risky:` names the class the database calls `speculative`. Support is an activity category, not a risk class, so a support project carries no risk tag.
@@ -191,7 +196,7 @@ Inside a table cell `:safe:` is literal text, because org reads `:tag:` syntax o
 
 ## Schedule-code file names
 
-A weekly table can be named by a compact code that encodes the whole week, for example `4gAAeAsA-gWW.org`. Lowercase letters are activities (`g` generative, `e` editing, `s` support), uppercase letters are projects (one letter is one block), and a digit at the start of a group is the count of consecutive days. A hyphen separates day groups, and `o` is an open day. The full specification is in `docs/table-file-naming-rules.org`.
+A weekly table can be named by a compact code that encodes the whole week, for example `4gAAeAsA-gWW.org`. Lowercase letters are activities (`g` generative, `e` editing, `s` support), uppercase letters and single digits are projects (one character is one block), and a digit before the first activity letter of a group is the count of consecutive days. A hyphen separates day groups, and `o` is an open day. The full specification is in `docs/table-file-naming-rules.org`.
 
 ```
 M-x writing-habit-name RET 4gAAeAsA-gWW RET

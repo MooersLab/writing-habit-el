@@ -61,7 +61,9 @@
                   '("plan" "import" "my-week.org" "--week" "2026-01-19" "--db" "x.db"))
                  '(("plan" "import" "my-week.org")
                    . (("week" . "2026-01-19") ("db" . "x.db")))))
-  (should-error (writing-habit--parse-args '("initdb" "--db"))))       ; missing value
+  (should-error (writing-habit--parse-args '("initdb" "--db")))        ; missing value
+  (should (equal (writing-habit--parse-args '("track" "sync" "m.db" "--dry-run" "--db" "x.db"))
+                 '(("track" "sync" "m.db") ("dry-run" . t) ("db" . "x.db")))))
 
 
 ;;;; Dispatch

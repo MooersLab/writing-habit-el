@@ -5,7 +5,7 @@
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Version: 0.0.0
-;; Package-Requires: ((emacs "29.1") (transient "0.4") (writing-schedule "0.3.1"))
+;; Package-Requires: ((emacs "29.1") (transient "0.4") (writing-schedule "0.5.0"))
 ;; Keywords: convenience, tools, org
 ;; URL: https://github.com/MooersLab/writing-habit-el
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -49,6 +49,8 @@
 ;;         plan import my-week.org --week 2026-01-19 --db habit.db
 ;;   emacs --batch -l writing-habit -f writing-habit-batch \
 ;;         track import actuals.csv --format csv --db habit.db
+;;   emacs --batch -l writing-habit -f writing-habit-batch \
+;;         track sync ~/6003TimeTracking/cb/mytime.db --db habit.db [--dry-run]
 ;;   emacs --batch -l writing-habit -f writing-habit-batch compare --week 2026-01-19 --db habit.db
 ;;   emacs --batch -l writing-habit -f writing-habit-batch \
 ;;         dashboard --week 2026-01-19 --out week.html --db habit.db
@@ -105,22 +107,31 @@ Safe to run on an existing database."
 
 ;;;; Command-line dispatch
 
+(defconst writing-habit--flags '("--dry-run")
+  "Options that take no value.")
+
 (defun writing-habit--parse-args (args)
   "Split ARGS into a cons (POSITIONALS . OPTIONS).
 POSITIONALS is a list of bare tokens.  OPTIONS is an alist mapping the name
-of each --flag (without the dashes) to the token that follows it."
+of each --flag (without the dashes) to the token that follows it, or to t
+for an option in `writing-habit--flags', which takes no value."
   (let ((pos '()) (opts '()))
     (while args
       (let ((tok (car args)))
-        (if (string-prefix-p "--" tok)
+        (cond
+         ((member tok writing-habit--flags)
+          (push (cons (substring tok 2) t) opts)
+          (setq args (cdr args)))
+         ((string-prefix-p "--" tok)
             (let ((key (substring tok 2))
                   (val (cadr args)))
               (when (or (null val) (string-prefix-p "--" val))
                 (error "Option --%s needs a value" key))
               (push (cons key val) opts)
-              (setq args (cddr args)))
+              (setq args (cddr args))))
+         (t
           (push tok pos)
-          (setq args (cdr args)))))
+          (setq args (cdr args))))))
     (cons (nreverse pos) (nreverse opts))))
 
 (defun writing-habit--opt (opts name)
@@ -191,7 +202,25 @@ entry point, factored out so it can be tested directly."
                          :end (writing-habit--opt opts "end")
                          :note (writing-habit--opt opts "note")))
               (writing-habit-db-close db))))
-         (_ (error "Usage: track import|add ..."))))
+         ("sync"
+          (let ((source (nth 2 pos))
+                (db (writing-habit-db-connect (writing-habit--req opts "db"))))
+            (unless source
+              (error "Usage: track sync MYTIME.DB --db DB [--since DAY] [--until DAY] %s"
+                     "[--scope semester|legend|all] [--table FILE] [--dry-run]"))
+            (unwind-protect
+                (let* ((since (or (writing-habit--opt opts "since")
+                                  (writing-habit-track-default-since db)))
+                       (until (writing-habit--opt opts "until"))
+                       (dry (writing-habit--opt opts "dry-run"))
+                       (report (writing-habit-track-sync-mytime
+                                db source :since since :until until
+                                :scope (or (writing-habit--opt opts "scope") "semester")
+                                :table (writing-habit--opt opts "table")
+                                :dry-run dry)))
+                  (writing-habit-track-sync-report-string report source since until dry))
+              (writing-habit-db-close db))))
+         (_ (error "Usage: track import|add|sync ..."))))
       ("compare"
        (let* ((week (writing-habit--req opts "week"))
               (plot (writing-habit--opt opts "plot"))

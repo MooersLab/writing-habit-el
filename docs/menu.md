@@ -18,7 +18,7 @@ writing-habit   database: ~/habit.db
 | Generate | generate a week, generate a day, export `.ics`, list archived weeks | `writing-schedule.el` |
 | Sheets | sheets for a week, a sheet for one day | `writing-schedule.el` |
 | Plan | `initdb`, `plan import` | `writing-habit` |
-| Track | `track import`, `track add`, harvest org clocks | `writing-habit` |
+| Track | `track import`, `track add`, harvest org clocks, `track sync` from mytime.db | `writing-habit` |
 | Compare | `compare`, `dashboard` | `writing-habit` |
 | History | `history` | `writing-habit` |
 | Context | `context set`, `clear`, `list` | `writing-habit` |

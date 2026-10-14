@@ -25,6 +25,7 @@ so you can keep more than one.
 | `writing-habit-track-import-csv-file` | Import the tracking CSV. |
 | `writing-habit-track-import-ics-file` | Import an actuals calendar. |
 | `writing-habit-track-harvest-clock-file` | Harvest completed org-clock entries. |
+| `writing-habit-track-sync-mytime-file` | Copy timed sessions from a mytime.db time-tracking database. With a prefix argument, choose the scope and make a dry run. |
 | `writing-habit-report-week` | Show the weekly comparison as an org buffer. |
 | `writing-habit-dashboard` | Write and open the HTML dashboard. |
 | `writing-habit-seasons` | Write and open the seasons dashboard, grouped by month, context, and schedule. |
@@ -47,6 +48,8 @@ drives one port drives the other with only the launcher changed.
 emacs --batch -l writing-habit -f writing-habit-batch initdb --db DB
 emacs --batch -l writing-habit -f writing-habit-batch plan import TABLE --week DATE --db DB
 emacs --batch -l writing-habit -f writing-habit-batch track import FILE --format csv|ics --db DB
+emacs --batch -l writing-habit -f writing-habit-batch \
+      track sync MYTIME.DB [--since DATE] [--until DATE] [--scope semester|legend|all] [--table TABLE] [--dry-run] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch \
       track add --day DATE --project CODE [--minutes N] [--category C] [--start HH:MM] [--end HH:MM] [--note TEXT] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch compare --week DATE [--plot FILE] --db DB
@@ -72,6 +75,16 @@ twice, because the schema uses `IF NOT EXISTS` throughout.
 
 `track import` loads actual sessions from a file, with `--format csv` for the
 tracking CSV and `--format ics` for an actuals calendar. `csv` is the default.
+
+`track sync` copies timed sessions from the `zTimeSpent` table of a mytime.db
+time-tracking database, which it opens only to read. The week's legend turns
+each four-digit project number into its code. `--scope semester`, the
+default, also keeps work on a project of the current or completed semester
+list, filed under its directory name as unplanned work. `--scope legend` keeps
+only the week's legend, and `--scope all` keeps every project. A week with no
+imported plan borrows the legend of `--table`. `--dry-run` reports and writes
+nothing. A rerun updates rows instead of duplicating them. See the tracking
+formats page for details.
 
 `track add` inserts one session. Give `--minutes`, or both `--start` and
 `--end`, and give `--category` when the activity matters.

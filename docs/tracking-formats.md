@@ -80,6 +80,38 @@ nothing new. Harvested rows carry the `manual` source with a `source_ref` that
 begins `orgclock:`, which keeps the shared schema unchanged, so a database that
 holds harvested clocks still reads cleanly in the Python port.
 
+## A mytime.db time-tracking database
+
+`M-x writing-habit-track-sync-mytime-file` copies timed sessions from the
+`zTimeSpent` table of a mytime.db database. It prompts for the habit database
+and for the mytime.db, which defaults to `writing-habit-track-mytime-db`
+(`~/6003TimeTracking/cb/mytime.db`). With a prefix argument it also asks for
+the scope and makes a dry run that writes nothing. The report opens in a
+buffer. In the menu, `t` then `y` runs the same sync, and the "Sync from
+mytime.db" group sets the scope, the first and last days, a fallback table, and
+the dry run. From a shell:
+
+```sh
+emacs --batch -l writing-habit -f writing-habit-batch \
+      track sync ~/6003TimeTracking/cb/mytime.db --db ~/org/writing-habit.db --dry-run
+```
+
+The tracker names a project by its four-digit number and directory, such as
+`1008ToolsForQCrOfRNA`, and the weekly table names it by a legend code, such
+as `Z`. The legend of the week each session falls in joins the two, so a code
+may stand for a different project from one week to the next. The table that
+planned the week comes first. A week with no imported plan uses `--table`, then
+the nearest earlier planned week. The tracker's Activity tag sets the activity
+by its first letter, `g` generative, `e` or `r` editing, and `s` support. A
+session with no tag takes the activity of the planned block it overlaps.
+Sessions that cross midnight wrap, so 21:00 to 00:00 is 180 minutes.
+
+Each copied row carries the source `sqlite` and the `source_ref`
+`mytime.db:zTimeSpent:<id>`, so a rerun updates a session you edited in the
+tracker and never duplicates one. The sync matches `track sync` of the Python
+package row for row and prints the same report, which ends with the projects
+it left out and their minutes.
+
 ## Marking safe and speculative projects
 
 The barbell view needs to know which projects are safe and which are

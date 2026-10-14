@@ -69,4 +69,30 @@ for f in sys.argv[1:]:
     p(f,"unk",",".join(t.unknown_sections()))
     for code in t.legend():
         i=t.project_info(code); p(f,"info",code,i["name"],i["due"],i["risk"])
+# Legend order, deadlines, the semester lists, and the numbers sync reads
+from datetime import date
+from writing_habit.project_lists import NAMES, CURRENT, COMPLETED
+from writing_habit.track import mytime_sync as ms
+for f in sys.argv[1:]:
+    text=open(f,encoding="utf-8").read()
+    fresh=lambda: WeeklyTable(text, path=f)
+    t=fresh()
+    u=fresh(); p(f,"lsort",b(u.sort_legend()),h(u.to_text()))
+    ch=t.tidy_legend(date(2026,10,14))
+    p(f,"tidy",";".join(f"{i},{c},{o},{pr},{d},{dr}" for i,c,o,pr,d,dr in ch))
+    u=fresh(); u.tidy_legend(date(2026,10,14),apply=True); p(f,"tidyapply",h(u.to_text()))
+    p(f,"lists",",".join(t.lists.present()))
+    for name in NAMES:
+        for e in t.lists.entries(name):
+            p(f,"lent",name,e.code,e.project,e.deadline,e.risk,e.activity,e.text())
+        if name in t.lists.present():
+            u=fresh(); p(f,"lsortlist",name,b(u.lists.sort(name)),h(u.to_text()))
+    if t.lists.entries(CURRENT):
+        for pos in range(len(t.lists.entries(CURRENT))):
+            u=fresh(); e=u.lists.transfer(CURRENT,pos,COMPLETED); p(f,"complete",pos,e.text(),h(u.to_text()))
+            u=fresh(); e=t.lists.entries(CURRENT)[pos]
+            try: at=u.copy_to_legend(e); p(f,"copyleg",pos,at,h(u.to_text()))
+            except ValueError: p(f,"copyleg",pos,"ERR")
+    p(f,"lnum",";".join(f"{k}={v}" for k,v in ms.legend_numbers(f).items()))
+    p(f,"snum",",".join(sorted(ms.semester_numbers(f))))
 print("\n".join(out))

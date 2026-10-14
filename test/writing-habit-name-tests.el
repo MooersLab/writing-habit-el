@@ -62,9 +62,71 @@
     (should (= (cdr (assoc "W" proj)) 2))))
 
 (ert-deftest writing-habit-name-bad-codes ()
-  "A block before an activity, and a digit inside a pattern, both fail."
+  "A block before an activity, and a letter that is no activity, both fail."
   (should-error (writing-habit-name-decode "gAA-A"))
-  (should-error (writing-habit-name-decode "g1A")))
+  (should-error (writing-habit-name-decode "g1x")))
+
+(ert-deftest writing-habit-name-digit-codes ()
+  "A digit after an activity letter is a project, and before it a day count."
+  (let ((decoded (writing-habit-name-decode "4g12e3-o-gA0")))
+    (should (equal (cdr (nth 0 decoded))
+                   '(("generative" . "1") ("generative" . "2") ("editing" . "3"))))
+    (should (equal (cdr (nth 3 decoded)) (cdr (nth 0 decoded))))
+    (should (null (cdr (nth 4 decoded))))
+    (should (equal (cdr (nth 5 decoded)) '(("generative" . "A") ("generative" . "0"))))
+    (should (equal (writing-habit-name-decode (writing-habit-name-encode decoded)) decoded)))
+  (should (equal (writing-habit-name-parse-legend-cell "3: 0374qflip :risky:")
+                 '("3" "0374qflip" "speculative")))
+  (should-not (writing-habit-name-parse-legend-cell "5:00-06:30")))
+
+(ert-deftest writing-habit-name-deadline ()
+  "A trailing ISO date is the deadline, and only a real date is valid."
+  (should (equal (writing-habit-name-split-deadline "1008ToolsForQCrOfRNA 2026-10-05")
+                 '("1008ToolsForQCrOfRNA" . "2026-10-05")))
+  (should (equal (writing-habit-name-split-deadline "0201dusp1, 2026-11-01")
+                 '("0201dusp1" . "2026-11-01")))
+  (should (equal (writing-habit-name-split-deadline "0201dusp1 November 1")
+                 '("0201dusp1 November 1")))
+  (should (equal (writing-habit-name-join-deadline "0201dusp1" "2026-11-01")
+                 "0201dusp1 2026-11-01"))
+  (should (equal (writing-habit-name-join-deadline "0201dusp1" nil) "0201dusp1"))
+  (dolist (case '(("" . t) ("2026-11-15" . t) ("2026-02-30") ("Nov 15") ("2026-1-5")))
+    (should (eq (and (writing-habit-name-valid-deadline-p (car case)) t) (cdr case)))))
+
+(ert-deftest writing-habit-name-tidy-description ()
+  "Free text becomes a project, a deadline, and the text that was dropped."
+  (let ((ref (calendar-absolute-from-gregorian '(10 5 2026))))
+    (dolist (case '(("1006AIrxOpt, NSF Dec 15" "1006AIrxOpt" "2026-12-15" "NSF")
+                    ("1452PHFSboXt, March 1" "1452PHFSboXt" "2027-03-01" "")
+                    ("0211dnph1 Submitted October 1" "0211dnph1" nil "Submitted October 1")
+                    ("4072UsersMeeting2026 Sep 16, 0382CCinJN, December 31"
+                     "4072UsersMeeting2026, 0382CCinJN" "2026-12-31" "Sep 16")
+                    ("0393ReprMGNB before October 8" "0393ReprMGNB" "2026-10-08" "")
+                    ("0470doeBarat, Ocotober 31" "0470doeBarat" "2026-10-31" "")
+                    ("0437mpDOE, part of grant 1008, hold back"
+                     "0437mpDOE" nil "part of grant 1008, hold back")
+                    ("2026words" "2026words" nil "")
+                    ("email, Sept 25" "email" "2026-09-25" "")
+                    ("0201dusp1 2026-11-01" "0201dusp1" "2026-11-01" "")))
+      (should (equal (writing-habit-name-tidy-description (car case) ref) (cdr case))))))
+
+(ert-deftest writing-habit-name-number-key ()
+  "Projects sort by their four-digit number, with unnumbered ones last."
+  (should (writing-habit-name-key< (writing-habit-name-number-key "0374qflip")
+                                   (writing-habit-name-number-key "1006AIrxOpt")))
+  (should (writing-habit-name-key< (writing-habit-name-number-key "1006AIrxOpt")
+                                   (writing-habit-name-number-key "email"))))
+
+(ert-deftest writing-habit-name-read-legend-first-table-only ()
+  "The semester lists after the weekly table are not its legend."
+  (let ((file (make-temp-file "wh-legend" nil ".org"
+                              (concat "| Time | M |\n|------+---|\n| 05:00-06:00 | B |\n"
+                                      "| B: 1006AIrxOpt :safe: |  |\n\n"
+                                      "#+NAME: current-semester-projects\n"
+                                      "| A: 1094RNAstrucDetResearchProgram :safe: |\n"))))
+    (unwind-protect
+        (should (equal (mapcar #'car (writing-habit-name-read-legend file)) '("B")))
+      (delete-file file))))
 
 (ert-deftest writing-habit-name-legend-check-exact-and-alias ()
   "Exact codes resolve, and a single-letter alias resolves to its code."

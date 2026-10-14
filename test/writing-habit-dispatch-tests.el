@@ -95,6 +95,27 @@
         (should (string-match-p "Weekly adherence history" log))
         (should (string-match-p "Tagged the week of 2026-01-19 with teaching" log))))))
 
+(ert-deftest writing-habit-dispatch/track-sync ()
+  "track sync reads a mytime.db and logs the batch line and the report."
+  (writing-habit-dispatch-tests--with-dir dir
+    (let ((db (concat dir "h.db"))
+          (src (concat dir "mytime.db")))
+      (writing-habit-dispatch--initdb (list (concat "--db=" db)))
+      (let ((s (sqlite-open src)))
+        (sqlite-execute s (concat "CREATE TABLE zTimeSpent (id INTEGER PRIMARY KEY,"
+                                  " DateDashed DATE, Start TIME, \"End\" TIME, ProjectID INT,"
+                                  " ProjectDirectory TEXT, Description TEXT, Activity TEXT)"))
+        (sqlite-execute s (concat "INSERT INTO zTimeSpent VALUES"
+                                  " (1, '2026-10-05', '05:00', '06:00', 1008, '1008Tools', '', 'g')"))
+        (sqlite-close s))
+      (writing-habit-dispatch--track-sync
+       (list (concat "--db=" db) (concat "--path=" src) "--since=2026-10-01"
+             "--scope=all" "--dry-run" "--day=2026-10-05" "--format=csv"))
+      (let ((log (writing-habit-dispatch-tests--log)))
+        (should (string-match-p "writing-habit-batch track sync .*mytime.db --db .* --dry-run" log))
+        (should (string-match-p "Dry run, nothing written. Read 1 rows" log))
+        (should (string-match-p "inserted 1, updated 0" log))))))
+
 (ert-deftest writing-habit-dispatch/errors-are-logged ()
   "A failing command is logged as an error rather than signalled."
   (writing-habit-dispatch-tests--with-dir dir

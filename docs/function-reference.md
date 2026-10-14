@@ -41,6 +41,9 @@ Decodes a schedule file-name code. Needs no database and no third-party package.
 | `writing-habit-name-summary` | function | Return the block totals by activity and by project. |
 | `writing-habit-name-legend-activity`, `-split-legend-activity` | function | Read and strip a default activity tag such as `@support` in a legend cell. |
 | `writing-habit-name-read-legend` | function | Read a weekly table's legend into an alist. |
+| `writing-habit-name-split-deadline`, `-join-deadline` | function | Split a description into a project and a trailing `YYYY-MM-DD` deadline, and join them back. |
+| `writing-habit-name-tidy-description` | function | Propose a project, a deadline, and the dropped text for a free-text description. |
+| `writing-habit-name-number-key`, `-key<` | function | Sort by the four-digit project number, unnumbered projects last. |
 | `writing-habit-name-check-against-legend` | function | Match each project letter to a legend entry. |
 | `writing-habit-name-report-string` | function | Return the full decode-and-check report as a string. |
 
@@ -67,6 +70,10 @@ package.
 | `writing-habit-track-import-csv-file` | command | Import the tracking CSV into a database file. |
 | `writing-habit-track-import-ics-file` | command | Import an actuals calendar into a database file. |
 | `writing-habit-track-harvest-clock-file` | command | Harvest completed org clocks into a database file. |
+| `writing-habit-track-sync-mytime-file` | command | Copy sessions from a mytime.db into a database file and show the report. |
+| `writing-habit-track-sync-mytime` | function | Copy timed sessions from `zTimeSpent`, keyed by `source_ref`, and return a report. |
+| `writing-habit-track-sync-report-string` | function | The sync report as text, the same as the Python one. |
+| `writing-habit-track-legend-numbers`, `-semester-numbers` | function | The project numbers a table's legend and semester lists name. |
 | `writing-habit-track-add` | function | Insert one session into an open database and return its id. |
 | `writing-habit-track-import-csv` | function | Insert one session per data row of the tracking CSV. |
 | `writing-habit-track-import-ics` | function | Insert one session per bracketed-code event of an ICS calendar. |
@@ -136,8 +143,11 @@ line, rules included.
 | `writing-habit-table-remove-block`, `-can-remove-block` | function | Delete a time block; a section header stays. |
 | `writing-habit-table-remove-legend` | function | Delete a project from the legend. |
 | `writing-habit-table-cells-using` | function | How many grid cells hold a code. |
-| `writing-habit-table-next-free-code` | function | The first unused code, A to Z and then AA to ZZ. |
-| `writing-habit-table-project-codes` | constant | The 702 codes offered to new projects, in order. |
+| `writing-habit-table-next-free-code` | function | The first unused code, A to Z, 0 to 9, and then AA to ZZ. |
+| `writing-habit-table-project-codes` | constant | The 712 codes offered to new projects, in order. |
+| `writing-habit-table-sort-legend`, `-tidy-legend` | function | Order the legend by project number, and split descriptions into a project and a deadline. |
+| `writing-habit-table-list-entries`, `-sort-list` | function | Read and sort a semester list that follows the table. |
+| `writing-habit-table-copy-entry-to-legend`, `-complete-entry` | function | Copy a list entry into the legend, and move a current entry to the completed list. |
 | `writing-habit-table-split-cell`, `-normalize-cell` | function | Split a cell such as `eA` into its activity letter and code. |
 | `writing-habit-table-block-category`, `-block-activity-source` | function | The resolved activity of a block, and where it came from. |
 | `writing-habit-table-legend-defaults` | function | The default activity of each legend code. |
@@ -161,6 +171,8 @@ line, rules included.
 | `writing-habit-table-report` | command | The name, clashes, totals, and legend in a side window. |
 | `writing-habit-table-delete-row`, `-delete-project` | command | Delete the block or legend entry at point, asking first when it is in use. |
 | `writing-habit-table-move-activities` | command | Move the section activities into the cells. |
+| `writing-habit-table-sort-by-number`, `-split-legend` | command | Sort the legend or the list at point, and split descriptions into a project and a deadline. |
+| `writing-habit-table-copy-to-legend`, `-mark-completed` | command | Copy the list entry at point into the legend, and mark a current project completed. |
 
 The other commands are listed in {doc}`table-mode`.
 
@@ -175,11 +187,25 @@ The other commands are listed in {doc}`table-mode`.
 | `writing-habit-dispatch-preview` | command | Show a file the way its kind deserves. |
 | `writing-habit-dispatch-show-log` | command | Show the log. |
 
+## writing-habit-lists
+
+Ports `project_lists.py`. Each function takes the lines after the weekly
+table and returns new lines, so the caller decides when to write.
+
+| Symbol | Kind | What it does |
+|--------|------|--------------|
+| `writing-habit-lists` | constant | The six list names and their titles, nearest horizon first. |
+| `writing-habit-lists-entries`, `-present` | function | The entries of one list, and the lists a file holds. |
+| `writing-habit-lists-insert`, `-remove`, `-move`, `-set-entry` | function | Edit one list. |
+| `writing-habit-lists-sort`, `-transfer` | function | Sort a list by project number, and move an entry to another list. |
+| `writing-habit-lists-semester-numbers` | function | The project numbers on the current and completed lists. |
+
 ## Configuration
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `writing-habit-db-schema-file` | `schema.sql` beside the package | Path to the shared schema. |
+| `writing-habit-track-mytime-db` | `~/6003TimeTracking/cb/mytime.db` | The mytime.db that `track sync` reads. |
 | `writing-habit-report-python` | `"python3"` | Interpreter for the optional plots. |
 | `writing-habit-default-db` | nil | Database that seeds the forms of the menu. |
 | `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes. |

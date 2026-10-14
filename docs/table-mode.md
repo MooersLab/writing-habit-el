@@ -59,6 +59,11 @@ idle time.
 | `D` | `writing-habit-table-delete-project` | delete the legend entry at point |
 | `m` | `writing-habit-table-move-activities` | write each section's activity letter into its cells, then offer to delete the section rows |
 | `s` | `writing-habit-table-update-legend` | give every code in the grid a legend row |
+| `N` | `writing-habit-table-sort-by-number` | order the legend, or the semester list at point, by project number |
+| `t` | `writing-habit-table-split-legend` | split each legend description into a project name and a `YYYY-MM-DD` deadline |
+| `l` | `writing-habit-table-copy-to-legend` | copy the semester-list project at point into this week's legend |
+| `C` | `writing-habit-table-mark-completed` | move the current-semester project at point to the completed list |
+| `S` | `writing-habit-table-sort-by-number` | the same command, listed under "Semester lists" |
 | `r` | `writing-habit-table-report` | show the name, clashes, totals, and legend in a side window |
 | `c` | `writing-habit-table-rename-file` | rename the file to the canonical code of its grid |
 | `n` | `writing-schedule-new-week-from-template` | start this week from a template |
@@ -115,14 +120,20 @@ added for a code no cell uses any more is dropped, as when the cell is cleared.
 ### Inserting a project
 
 The prompt for the code starts with the first code that neither the legend nor
-the grid uses yet. The single letters come first, and once A to Z are all taken
-the prompt offers `AA`, `AB`, and so on to `ZZ`, which makes room for 702
-projects. A grid cell takes a two-letter code just as it takes a letter, and
-completion offers it. A code is a capital letter followed by up to three
-capitals or digits. A code the legend already defines is refused. The
-description may end in a due date such as `Sept 25`, which eldoc reads, the
-risk tag is one of `none`, `safe`, and `risky`, and the default activity is one
-of `none`, `generative`, `editing`, and `support`.
+the grid uses yet. The single letters come first, then the digits `0` to `9`,
+and once those 36 are all taken the prompt offers `AA`, `AB`, and so on to `ZZ`,
+which makes room for 712 projects. A grid cell takes a digit or a two-letter
+code just as it takes a letter, and completion offers it. A code is a single
+digit, or a capital letter followed by up to three capitals or digits. A legend
+row whose label reads as a time, such as `5:00-06:30`, is a time block and not
+project 5. A code the legend already defines is refused.
+
+The prompt then asks for the project name, such as `0201dusp1`, and for its
+deadline as `YYYY-MM-DD`. Leave the deadline empty when there is none. The two
+are written into the legend as `C: 0201dusp1 2026-11-01`, with the deadline
+last, the same form the Python version writes. The risk tag is one of `none`,
+`safe`, and `risky`, and the default activity is one of `none`, `generative`,
+`editing`, and `support`.
 
 ### Deleting a project
 
@@ -177,6 +188,53 @@ than one letter, and the report says which code is at fault. Everything else
 reads a two-letter code whole, including the scheduler, the plan importer, the
 totals, and eldoc, so a legend with more than 26 projects is fine. Only a week
 whose cells use the two-letter codes loses its file name.
+
+## Deadlines and sorting the legend
+
+`t` in the menu, `writing-habit-table-split-legend`, rewrites each legend
+description as a project name followed by an ISO deadline. A description such
+as `0104BaGquadShelxD November 15` becomes `0104BaGquadShelxD 2026-11-15`. A
+month and day with no year take the current year, unless that puts them more
+than about two months in the past, when they take the next year. A date led by
+`submitted` or `sent` records something done, not a deadline, so it is dropped
+rather than used. The command shows every change first and asks before it
+writes. The rule matches `tidy_description` in the Python package line for
+line.
+
+`N` in the menu, `writing-habit-table-sort-by-number`, orders the legend by the
+four-digit project number at the start of each project name. Projects without
+a number, such as `email`, keep their order after the numbered ones. Only the
+legend rows trade places, so the grid and the rules stay where they are. With
+point in a semester list, `N` sorts that list instead.
+
+## The semester project lists
+
+The weekly legend holds only this week's projects. Longer horizons live in
+named org tables after the weekly table, which the scheduler never reads:
+
+| Name | Holds |
+|------|-------|
+| `current-semester-projects` | every project of this semester |
+| `completed-this-semester` | projects finished this semester |
+| `next-semester-projects` | next semester |
+| `next-next-semester-projects` | the semester after that |
+| `next-next-next-semester-projects` | three semesters out |
+| `next-next-next-next-semester-projects` | four semesters out |
+
+```org
+#+NAME: current-semester-projects
+| H: 0104BaGquadShelxD 2026-11-15 :safe: |
+| - 0920ReviewForJBC                    |
+```
+
+Each row has the legend's one-cell form. A row that has no code yet starts
+with `-`. Put point on a row and use the "Semester lists" column of the menu.
+`l` copies the project into this week's legend, keeping its code when the
+legend does not use it and taking the first free code otherwise. `C` moves a
+row of the current list to the completed list in one step and creates that
+list when it is missing. `S` sorts the list at point by project number. The
+lists are the same tables the Python GUI shows as tabs beside "This week", so
+either tool edits them.
 
 ## How edits keep the file intact
 

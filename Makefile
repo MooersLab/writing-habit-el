@@ -14,6 +14,7 @@ WRITING_SCHEDULE_DIR ?=
 
 MODULES = writing-habit-db.el \
           writing-habit-name.el \
+          writing-habit-lists.el \
           writing-habit-plan.el \
           writing-habit-track.el \
           writing-habit-compare.el \
@@ -29,6 +30,7 @@ MODULES = writing-habit-db.el \
           writing-habit.el
 
 TESTS = test/writing-habit-name-tests.el \
+        test/writing-habit-lists-tests.el \
         test/writing-habit-db-tests.el \
         test/writing-habit-plan-tests.el \
         test/writing-habit-track-tests.el \

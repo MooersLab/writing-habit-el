@@ -12,9 +12,11 @@ summary.
 
 The code uses three character classes that never overlap, so a day needs no
 separators inside it. Lowercase letters name activities, namely `g` for
-generative, `e` for editing, and `s` for support. Uppercase letters name
-projects, and one uppercase letter is one block on that project. A digit at the
-start of a group is the count of consecutive days that share the pattern. A
+generative, `e` for editing, and `s` for support. Uppercase letters and single
+digits name projects, and one such character is one block on that project. A
+digit before the first activity letter of a group is the count of consecutive
+days that share the pattern, and a digit after an activity letter is a project,
+so `4g12` reads as four days of one block on project 1 and one on project 2. A
 hyphen marks the boundary where the daily pattern changes. A lone `o` is an open
 day that carries no blocks.
 
@@ -57,5 +59,6 @@ The code assumes a project is a single uppercase letter, because a run such as
 `gAA` depends on each letter being one block. Several legend codes have two
 letters, for example `EM` for email and `TT` for teaching, so give every
 multi-letter project a single-letter alias for the file name and keep the full
-code in the table legend. Reserve digits for counts, so a project alias never
-contains a digit.
+code in the table legend. An alias may also be a single digit, which gives 36
+one-character codes in all. A digit always follows an activity letter in the
+name, so it never reads as a day count.

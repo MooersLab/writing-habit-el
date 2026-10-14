@@ -193,7 +193,7 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
   "A project is inserted below the entry at point with the next free code."
   (writing-habit-table-mode-tests--with ("gA.org" "my-week-named.org")
     (writing-habit-table-mode-tests--goto "A: ")
-    (let ((answers '("New thing, Oct 3"))
+    (let ((answers '("0201dusp1" "2026-11-01"))
           (offered nil))
       (cl-letf (((symbol-function 'read-string)
                  (lambda (prompt &optional initial &rest _)
@@ -203,7 +203,7 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
                 ((symbol-function 'completing-read) (lambda (&rest _) "risky")))
         (writing-habit-table-insert-project-below))
       (should (equal offered "C"))
-      (should (string-prefix-p "| C: New thing, Oct 3 :risky:"
+      (should (string-prefix-p "| C: 0201dusp1 2026-11-01 :risky:"
                                (writing-habit-table-mode-tests--line)))
       (forward-line -1)
       (should (string-prefix-p "| A: " (writing-habit-table-mode-tests--line))))))
@@ -316,7 +316,7 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
     (should (string-match-p "writing-habit-table-delete-project" suffixes))))
 
 (ert-deftest writing-habit-table-mode/insert-project-offers-aa ()
-  "With A to Z taken the code prompt offers AA."
+  "With A to Z and 0 to 9 taken the code prompt offers AA."
   (writing-habit-table-mode-tests--with
       ("gA.org" (concat "| Time <l>    | M |\n"
                         "|-------------+---|\n"
@@ -324,7 +324,8 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
                         "| 09:00-10:00 | A |\n"
                         "|-------------+---|\n"
                         (mapconcat (lambda (c) (format "| %c: x |   |\n" c))
-                                   (number-sequence ?A ?Z) "")))
+                                   (append (number-sequence ?A ?Z) (number-sequence ?0 ?9))
+                                   "")))
     (let ((offered nil))
       (cl-letf (((symbol-function 'read-string)
                  (lambda (prompt &optional initial &rest _)
@@ -335,6 +336,88 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
         (writing-habit-table-insert-project-below))
       (should (equal offered "AA"))
       (should (string-prefix-p "| AA: a 27th project" (writing-habit-table-mode-tests--line))))))
+
+;;;; Semester lists and the order of the legend
+
+(defconst writing-habit-table-mode-tests--lists
+  (concat "| Time <l>    | M  | Tu |\n"
+          "|-------------+----+----|\n"
+          "| 05:00-06:30 | gB | gX |\n"
+          "|-------------+----+----|\n"
+          "| B: 1006AIrxOpt 2026-12-15 :safe: |  |  |\n"
+          "| X: 0374qflip 2026-11-21 :risky:  |  |  |\n"
+          "\n"
+          "#+NAME: current-semester-projects\n"
+          "| A: 1094RNAstrucDetResearchProgram :safe: |\n"
+          "| B: 1006AIrxOpt 2026-12-15 :safe:         |\n"
+          "| X: 0374qflip 2026-11-21 :risky:          |\n"
+          "\n"
+          "#+NAME: next-semester-projects\n"
+          "| - 1452PHFSboXt 2027-03-01 :safe: |\n")
+  "A week of two projects followed by two semester lists.")
+
+(ert-deftest writing-habit-table-mode/sort-legend-and-list ()
+  "Sort by number orders the legend, or the list that holds point."
+  (writing-habit-table-mode-tests--with ("week.org" writing-habit-table-mode-tests--lists)
+    (writing-habit-table-mode-tests--goto "B: ")
+    (writing-habit-table-sort-by-number)
+    (should (string-match-p "| X: 0374qflip[^\n]*\n| B: 1006AIrxOpt" (buffer-string)))
+    (writing-habit-table-mode-tests--goto "A: 1094")
+    (writing-habit-table-sort-by-number)
+    (let ((model (writing-habit-table-current)))
+      (should (equal (mapcar #'writing-habit-lists-entry-code
+                             (writing-habit-table-list-entries model writing-habit-lists-current))
+                     '("X" "B" "A"))))))
+
+(ert-deftest writing-habit-table-mode/copy-to-legend ()
+  "A list project comes into the week, with a free code when it has none."
+  (writing-habit-table-mode-tests--with ("week.org" writing-habit-table-mode-tests--lists)
+    (writing-habit-table-mode-tests--goto "- 1452")
+    (writing-habit-table-copy-to-legend)
+    (should (string-prefix-p "| A: 1452PHFSboXt 2027-03-01 :safe:"
+                             (writing-habit-table-mode-tests--line)))
+    (writing-habit-table-mode-tests--goto "B: 1006AIrxOpt 2026-12-15 :safe:         |")
+    (should-error (writing-habit-table-copy-to-legend) :type 'user-error)))
+
+(ert-deftest writing-habit-table-mode/mark-completed ()
+  "A current project moves to the completed list, made after the current one."
+  (writing-habit-table-mode-tests--with ("week.org" writing-habit-table-mode-tests--lists)
+    (writing-habit-table-mode-tests--goto "B: 1006AIrxOpt 2026-12-15 :safe:         |")
+    (writing-habit-table-mark-completed)
+    (let ((model (writing-habit-table-current)))
+      (should (equal (mapcar #'writing-habit-lists-entry-code
+                             (writing-habit-table-list-entries model writing-habit-lists-current))
+                     '("A" "X")))
+      (should (equal (mapcar #'writing-habit-lists-entry-code
+                             (writing-habit-table-list-entries model writing-habit-lists-completed))
+                     '("B")))
+      (should (equal (mapcar #'car (writing-habit-table-legend model)) '("B" "X"))))
+    (should (< (string-match "#\\+NAME: completed-this-semester" (buffer-string))
+               (string-match "#\\+NAME: next-semester-projects" (buffer-string))))
+    (writing-habit-table-mode-tests--goto "- 1452")
+    (should-error (writing-habit-table-mark-completed) :type 'user-error)))
+
+(ert-deftest writing-habit-table-mode/split-legend ()
+  "Free-text descriptions become a project and a deadline after confirming."
+  (writing-habit-table-mode-tests--with
+      ("week.org" (concat "| Time <l>    | M  |\n|-------------+----|\n"
+                          "| 05:00-06:30 | gB |\n|-------------+----|\n"
+                          "| B: 1006AIrxOpt, NSF Dec 15 :safe: |  |\n"
+                          "| E: email @support                 |  |\n"))
+    (should (= (writing-habit-table-split-legend t) 1))
+    (should (string-match-p (format "| B: 1006AIrxOpt %s-12-15 :safe:"
+                                    (format-time-string "%Y"))
+                            (buffer-string)))
+    (should (string-match-p "| E: email @support" (buffer-string)))
+    (should-not (writing-habit-table-split-legend t))))
+
+(ert-deftest writing-habit-table-mode/lists-in-the-menu ()
+  "The table menu offers the commands for the semester lists."
+  (skip-unless writing-habit-table-mode-tests--ok)
+  (let ((suffixes (format "%S" (get 'writing-habit-table-menu 'transient--layout))))
+    (dolist (command '(writing-habit-table-sort-by-number writing-habit-table-copy-to-legend
+                       writing-habit-table-mark-completed writing-habit-table-split-legend))
+      (should (string-match-p (symbol-name command) suffixes)))))
 
 ;;;; Activities
 

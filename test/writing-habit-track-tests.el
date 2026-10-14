@@ -239,5 +239,172 @@
                          "2026-01-20")))
       (writing-habit-db-close db))))
 
+
+;;;; mytime.db sync
+
+(defconst writing-habit-track-tests--legend
+  (concat
+   "| Time <l>    | M  | Tu |\n"
+   "|-------------+----+----|\n"
+   "| 05:30-07:00 | gZ |    |\n"
+   "|-------------+----+----|\n"
+   "| F: 4072UsersMeeting2026 Sep 16, 0382CCinJN :safe: | | |\n"
+   "| H: 0104BaGquadShelxD November 15 :safe:          | | |\n"
+   "| Z: 1008ToolsForQCrOfRNA, submitted October 5 :safe: | | |\n")
+  "A week's legend, the same one the Python sync tests use.")
+
+(defconst writing-habit-track-tests--rows
+  '((1 "2026-10-05" "05:30" "07:00" 1008 "1008ToolsForQCrOfRNA" "grant text" "")
+    (2 "2026-10-05" "08:00" "09:00" 104 "0104BaGquadShelxD" "figures" "E")
+    (3 "2026-10-06" "3:45" "05:00" 382 "0382CCinJN" "" "sw")
+    (4 "2026-10-06" "06:00" "06:30" 6005 "6005EveningCommute" "" "none")
+    (5 "2026-10-06" "" "" "" "" "" "")
+    (6 "2026-10-07" "21:00" "00:00" 104 "0104BaGquadShelxD" "late" "G")
+    (7 "2026-09-28" "05:00" "06:00" 1008 "1008ToolsForQCrOfRNA" "before" "g"))
+  "zTimeSpent rows: id, date, start, end, ProjectID, directory, note, activity.")
+
+(defun writing-habit-track-tests--mytime (path rows)
+  "Write a mytime.db at PATH holding ROWS in zTimeSpent."
+  (let ((src (sqlite-open path)))
+    (unwind-protect
+        (progn
+          (sqlite-execute
+           src (concat "CREATE TABLE zTimeSpent (id INTEGER PRIMARY KEY, DateDashed DATE,"
+                       " Start TIME, \"End\" TIME, ProjectID INT, ProjectDirectory TEXT,"
+                       " Description TEXT, Activity TEXT DEFAULT none)"))
+          (dolist (r rows)
+            (sqlite-execute src "INSERT INTO zTimeSpent VALUES (?,?,?,?,?,?,?,?)" r)))
+      (sqlite-close src))))
+
+(defmacro writing-habit-track-tests--with-sync (vars &rest body)
+  "Run BODY with VARS (DB SOURCE TABLE DIR) bound to a planned week."
+  (declare (indent 1))
+  (let ((db (nth 0 vars)) (source (nth 1 vars)) (table (nth 2 vars)) (dir (nth 3 vars)))
+    `(let* ((,dir (make-temp-file "wh-sync" t))
+            (,table (expand-file-name "Oct5.org" ,dir))
+            (,source (expand-file-name "mytime.db" ,dir))
+            (,db (writing-habit-track-tests--fresh)))
+       (unwind-protect
+           (progn
+             (with-temp-file ,table (insert writing-habit-track-tests--legend))
+             (writing-habit-track-tests--mytime ,source writing-habit-track-tests--rows)
+             (sqlite-execute ,db (concat "INSERT INTO plan_week(week_start, schedule_code,"
+                                         " table_path) VALUES (?,?,?)")
+                             (list "2026-10-05" "Oct5" ,table))
+             (let ((pid (writing-habit-db-get-or-create-project
+                         ,db "Z" "1008ToolsForQCrOfRNA" "safe")))
+               (sqlite-execute ,db (concat "INSERT INTO plan_block(day, start_time, end_time,"
+                                           " project_id, category_id) VALUES"
+                                           " ('2026-10-05', '05:30', '07:00', ?, ?)")
+                               (list pid (writing-habit-db-get-category-id ,db "generative"))))
+             ,@body)
+         (writing-habit-db-close ,db)
+         (delete-directory ,dir t)))))
+
+(defun writing-habit-track-tests--sessions (db)
+  "Return an alist of mytime id to (CODE CATEGORY START MINUTES) in DB."
+  (mapcar (lambda (r)
+            (cons (car (last (split-string (nth 0 r) ":")))
+                  (cdr r)))
+          (sqlite-select
+           db (concat "SELECT s.source_ref, p.code, c.name, s.start_time, s.actual_min"
+                      " FROM session s JOIN project p USING(project_id)"
+                      " LEFT JOIN category c USING(category_id) ORDER BY s.source_ref"))))
+
+(ert-deftest writing-habit-track-sync/legend-numbers ()
+  "Every project number in a legend description maps to its code."
+  (writing-habit-track-tests--with-sync (_db _src table _dir)
+    (should (equal (writing-habit-track-legend-numbers table)
+                   '(("4072" . "F") ("0382" . "F") ("0104" . "H") ("1008" . "Z"))))))
+
+(ert-deftest writing-habit-track-sync/maps-numbers-and-activities ()
+  "Numbers become codes, tags become activities, and late work wraps midnight."
+  (writing-habit-track-tests--with-sync (db src _table _dir)
+    (let* ((report (writing-habit-track-sync-mytime db src))
+           (rows (writing-habit-track-tests--sessions db)))
+      (should (equal (sort (mapcar #'car rows) #'string<) '("1" "2" "3" "6")))
+      (should (equal (cdr (assoc "1" rows)) '("Z" "generative" "05:30" 90)))
+      (should (equal (cdr (assoc "2" rows)) '("H" "editing" "08:00" 60)))
+      (should (equal (cdr (assoc "3" rows)) '("F" "support" "03:45" 75)))
+      (should (= (nth 4 (assoc "6" rows)) 180))
+      (should (= (writing-habit-sync-inserted report) 4))
+      (should (= (writing-habit-sync-skipped-not-in-legend report) 1))
+      (should (= (writing-habit-sync-skipped-no-time report) 1))
+      (should (equal (writing-habit-sync-left-out-minutes report)
+                     '(("6005EveningCommute" . 30)))))))
+
+(ert-deftest writing-habit-track-sync/rerun-is-idempotent ()
+  "A rerun changes nothing, and an edit in the tracker updates its row."
+  (writing-habit-track-tests--with-sync (db src _table _dir)
+    (writing-habit-track-sync-mytime db src)
+    (let ((again (writing-habit-track-sync-mytime db src)))
+      (should (equal (list (writing-habit-sync-inserted again)
+                           (writing-habit-sync-updated again)
+                           (writing-habit-sync-unchanged again))
+                     '(0 0 4))))
+    (let ((s (sqlite-open src)))
+      (sqlite-execute s "UPDATE zTimeSpent SET \"End\" = '09:30' WHERE id = 2")
+      (sqlite-close s))
+    (should (= (writing-habit-sync-updated
+                (writing-habit-track-sync-mytime db src))
+               1))
+    (should (= (nth 4 (assoc "2" (writing-habit-track-tests--sessions db))) 90))
+    (should (= (caar (sqlite-select db "SELECT COUNT(*) FROM session")) 4))))
+
+(ert-deftest writing-habit-track-sync/scope-all ()
+  "Scope all keeps a project the legend does not name, under its directory."
+  (writing-habit-track-tests--with-sync (db src _table _dir)
+    (writing-habit-track-sync-mytime db src :scope "all")
+    (should (equal (nth 1 (assoc "4" (writing-habit-track-tests--sessions db)))
+                   "6005EveningCommute"))))
+
+(ert-deftest writing-habit-track-sync/semester-list ()
+  "Scope semester keeps a project on the current list as unplanned work."
+  (writing-habit-track-tests--with-sync (db src table _dir)
+    (with-temp-buffer
+      (insert-file-contents table)
+      (goto-char (point-max))
+      (insert "\n#+NAME: current-semester-projects\n| -: 6005EveningCommute |\n")
+      (write-region (point-min) (point-max) table))
+    (let ((report (writing-habit-track-sync-mytime db src)))
+      (should (= (writing-habit-sync-semester-unplanned report) 1))
+      (should (equal (nth 1 (assoc "4" (writing-habit-track-tests--sessions db)))
+                     "6005EveningCommute")))
+    (should-not (assoc "4" (progn (sqlite-execute db "DELETE FROM session")
+                                  (writing-habit-track-sync-mytime db src :scope "legend")
+                                  (writing-habit-track-tests--sessions db))))))
+
+(ert-deftest writing-habit-track-sync/dry-run ()
+  "A dry run counts the rows and writes nothing."
+  (writing-habit-track-tests--with-sync (db src _table _dir)
+    (let ((report (writing-habit-track-sync-mytime db src :dry-run t)))
+      (should (= (writing-habit-sync-inserted report) 4))
+      (should (= (caar (sqlite-select db "SELECT COUNT(*) FROM session")) 0))
+      (should (= (caar (sqlite-select db "SELECT COUNT(*) FROM project")) 1)))))
+
+(ert-deftest writing-habit-track-sync/since-and-table-fallback ()
+  "A week with no plan borrows the legend of the named table."
+  (writing-habit-track-tests--with-sync (db src table _dir)
+    (let ((report (writing-habit-track-sync-mytime
+                   db src :since "2026-09-28" :until "2026-10-05" :table table)))
+      (should (equal (sort (mapcar #'car (writing-habit-track-tests--sessions db)) #'string<)
+                     '("1" "2" "7")))
+      (should (= (writing-habit-sync-inserted report) 3))
+      (should (equal (writing-habit-sync-weeks-without-plan report)
+                     '("2026-09-28"))))))
+
+(ert-deftest writing-habit-track-sync/missing-source ()
+  "A missing mytime.db is a clear error."
+  (writing-habit-track-tests--with-sync (db _src _table dir)
+    (should-error (writing-habit-track-sync-mytime db (expand-file-name "nope.db" dir)))))
+
+(ert-deftest writing-habit-track-sync/report-text ()
+  "The report names the counts and the projects left out."
+  (writing-habit-track-tests--with-sync (db src _table _dir)
+    (let ((text (writing-habit-track-sync-report-string
+                 (writing-habit-track-sync-mytime db src) src "2026-10-05" nil nil)))
+      (should (string-match-p "inserted 4, updated 0, unchanged 0" text))
+      (should (string-match-p "    6005EveningCommute +30$" text)))))
+
 (provide 'writing-habit-track-tests)
 ;;; writing-habit-track-tests.el ends here

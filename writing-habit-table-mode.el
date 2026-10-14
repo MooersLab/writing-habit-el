@@ -405,12 +405,25 @@ them without asking."
 
 ;;;; The legend
 
+(defun writing-habit-table--read-deadline ()
+  "Read a deadline as YYYY-MM-DD, or nothing.
+Text that is not such a date is ignored with a message, as the window
+does, so the project is still added without a deadline."
+  (let ((text (string-trim (or (read-string "Deadline (YYYY-MM-DD, empty for none): ") ""))))
+    (if (writing-habit-name-valid-deadline-p text)
+        text
+      (message "Ignored the deadline %S: write it as YYYY-MM-DD" text)
+      "")))
+
 (defun writing-habit-table--read-project (model)
-  "Read a code, a description, a risk class, and an activity for MODEL.
-Return (CODE DESCRIPTION RISK ACTIVITY)."
+  "Read a code, a project and deadline, a risk class, and an activity for MODEL.
+Return (CODE DESCRIPTION RISK ACTIVITY), where DESCRIPTION is the project
+name followed by the deadline, as the legend stores it."
   (let* ((code (upcase (string-trim
                         (read-string "Project code: " (writing-habit-table-next-free-code model)))))
-         (description (read-string (format "Description of %s (a due date may follow): " code)))
+         (description (writing-habit-name-join-deadline
+                       (read-string (format "Project of %s, such as 0201dusp1: " code))
+                       (writing-habit-table--read-deadline)))
          (tag (completing-read "Risk tag: " '("none" "safe" "risky") nil t nil nil "none"))
          (activity (completing-read "Default activity: "
                                     '("none" "generative" "editing" "support")
@@ -455,6 +468,116 @@ Drop a blank row that this command added once its code leaves the grid."
         (progn (writing-habit-table--apply model) (message "Legend updated"))
       (when (called-interactively-p 'interactive)
         (message "The legend already covers the grid")))))
+
+;;;; Ordering and tidying the legend
+
+(defun writing-habit-table--list-at-point (model)
+  "Return (NAME . POSITION) for the semester list row at point in MODEL, or nil.
+NAME is the list, and POSITION the row's place among its projects."
+  (let* ((after-start (+ (length (writing-habit-table-before model))
+                         (length (writing-habit-table-rows model))))
+         (index (- (line-number-at-pos) 1 after-start))
+         (lines (writing-habit-table-after model)))
+    (when (and (>= index 0) (< index (length lines)))
+      (seq-some (lambda (name)
+                  (let ((position (cl-position index (writing-habit-lists-row-indexes lines name))))
+                    (and position (cons name position))))
+                (writing-habit-lists-names)))))
+
+(defun writing-habit-table--goto-list-row (model name position)
+  "Move point to row POSITION of the semester list NAME of MODEL."
+  (let ((index (nth position (writing-habit-lists-row-indexes
+                              (writing-habit-table-after model) name))))
+    (when index
+      (goto-char (point-min))
+      (forward-line (+ index (length (writing-habit-table-before model))
+                       (length (writing-habit-table-rows model))))
+      (when (search-forward "|" (line-end-position) t)
+        (skip-chars-forward " " (line-end-position))))))
+
+(defun writing-habit-table-sort-by-number ()
+  "Order the projects at point by the four-digit number that starts each name.
+With point in a semester list, sort that list; elsewhere, sort the week's
+legend.  Projects without a number, such as email, go last."
+  (interactive)
+  (let* ((model (writing-habit-table-current))
+         (spot (writing-habit-table--list-at-point model)))
+    (if spot
+        (if (writing-habit-table-sort-list model (car spot))
+            (progn (writing-habit-table--apply model)
+                   (writing-habit-table--goto-list-row model (car spot) 0)
+                   (message "Sorted %s by project number"
+                            (cdr (assoc (car spot) writing-habit-lists))))
+          (message "Already in order"))
+      (if (writing-habit-table-sort-legend model)
+          (progn (writing-habit-table--apply model)
+                 (writing-habit-table--goto model (car (writing-habit-table-legend-rows model)) 0)
+                 (message "Sorted this week's projects by project number"))
+        (message "Already in order")))))
+
+(defun writing-habit-table-copy-to-legend ()
+  "Copy the semester list project at point into this week's legend.
+The project keeps its code when the legend does not use it yet, and
+otherwise takes the first free code."
+  (interactive)
+  (let* ((model (writing-habit-table-current))
+         (spot (or (writing-habit-table--list-at-point model)
+                   (user-error "Put point on a project in a semester list first")))
+         (entry (nth (cdr spot) (writing-habit-table-list-entries model (car spot))))
+         (at (condition-case err (writing-habit-table-copy-entry-to-legend model entry)
+               (error (user-error "%s" (error-message-string err))))))
+    (writing-habit-table--apply model)
+    (writing-habit-table--goto model at 0)
+    (message "Copied %s to this week's legend as %s"
+             (writing-habit-lists-entry-project entry)
+             (car (writing-habit-table-row-parsed (writing-habit-table-row-at model at))))))
+
+(defun writing-habit-table-mark-completed ()
+  "Move the current semester project at point to Completed this semester.
+The project goes to the end of the completed list, which is created after
+the current list when the file has none.  A project the completed list
+already names only leaves the current list.  This week's legend is left
+alone, because a block already scheduled still needs its code."
+  (interactive)
+  (let* ((model (writing-habit-table-current))
+         (spot (writing-habit-table--list-at-point model)))
+    (unless (and spot (string= (car spot) writing-habit-lists-current))
+      (user-error "Put point on a project in the current semester list first"))
+    (let ((entry (writing-habit-table-complete-entry model (cdr spot))))
+      (writing-habit-table--apply model)
+      (let ((left (length (writing-habit-table-list-entries model writing-habit-lists-current))))
+        (when (> left 0)
+          (writing-habit-table--goto-list-row model writing-habit-lists-current
+                                              (min (cdr spot) (1- left)))))
+      (message "Marked %s completed this semester" (writing-habit-lists-entry-project entry)))))
+
+(defun writing-habit-table-split-legend (&optional confirm)
+  "Rewrite each legend description as a project name and a YYYY-MM-DD deadline.
+Old legends held free text, such as \"1006AIrxOpt, NSF Dec 15\".  The
+changes are listed first, with any text the split would drop, and are
+made only after you confirm.  CONFIRM answers that question in advance.
+A month and day with no year take the year of today, unless that is more
+than about two months past, when they take the next year."
+  (interactive)
+  (let* ((model (writing-habit-table-current))
+         (changes (writing-habit-table-tidy-legend model)))
+    (if (null changes)
+        (progn (message "Every legend entry is already a project and a deadline") nil)
+      (let ((go (or confirm
+                    (with-output-to-temp-buffer "*Split legend*"
+                      (dolist (c changes)
+                        (princ (format "%s: %s\n   project  %s\n   deadline %s\n%s"
+                                       (nth 1 c) (nth 2 c) (nth 3 c) (or (nth 4 c) "(none)")
+                                       (if (string-empty-p (nth 5 c)) ""
+                                         (format "   dropped  %s\n" (nth 5 c)))))))
+                    (yes-or-no-p (format "Rewrite %d legend entr%s? " (length changes)
+                                         (if (= (length changes) 1) "y" "ies"))))))
+        (when go
+          (writing-habit-table-tidy-legend model nil t)
+          (writing-habit-table--apply model)
+          (message "Split %d legend entr%s into project and deadline" (length changes)
+                   (if (= (length changes) 1) "y" "ies")))
+        (and go (length changes))))))
 
 ;;;; Completion and eldoc
 
@@ -721,7 +844,13 @@ the wrong plan shape."
     ("P" "Insert project below" writing-habit-table-insert-project-below)
     ("D" "Delete project" writing-habit-table-delete-project)
     ("m" "Move activities into cells" writing-habit-table-move-activities)
-    ("s" "Sync legend with grid" writing-habit-table-update-legend)]
+    ("s" "Sync legend with grid" writing-habit-table-update-legend)
+    ("N" "Sort by number" writing-habit-table-sort-by-number)
+    ("t" "Split into project and deadline" writing-habit-table-split-legend)]
+   ["Semester lists"
+    ("l" "Copy to this week's legend" writing-habit-table-copy-to-legend)
+    ("C" "Mark completed" writing-habit-table-mark-completed)
+    ("S" "Sort list by number" writing-habit-table-sort-by-number)]
    ["Week"
     ("r" "Report" writing-habit-table-report)
     ("c" "Rename to canonical" writing-habit-table-rename-file)

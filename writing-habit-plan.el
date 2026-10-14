@@ -168,7 +168,10 @@ import of the same week is a no-op."
     (dolist (ev events)
       (let* ((letter (plist-get ev :letter))
              (split (writing-habit-plan--split-risk (cdr (assoc letter legend))))
-             (desc (car split))
+             ;; The deadline is for the writer, not a part of the project's name.
+             (desc (let ((d (car split)))
+                     (and d (let ((name (car (writing-habit-name-split-deadline d))))
+                              (if (string-empty-p name) nil name)))))
              (risk (cdr split))
              (pid (writing-habit-db-get-or-create-project db letter desc risk))
              (cat-known (writing-habit-plan--category-for (plist-get ev :section)))

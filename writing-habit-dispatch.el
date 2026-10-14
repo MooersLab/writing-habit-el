@@ -83,6 +83,7 @@
 (defvar writing-schedule-overlap-action)
 (defvar writing-schedule-use-todo)
 (defvar writing-schedule-directory)
+(defvar writing-habit-track-mytime-db)
 
 (defgroup writing-habit-dispatch nil
   "The writing-habit command center."
@@ -382,6 +383,23 @@ INITIAL-INPUT and HISTORY are passed to `completing-read'."
        (princ (format "%s" (writing-habit-track-harvest-clock-file db org))))
      nil)))
 
+(transient-define-suffix writing-habit-dispatch--track-sync (args)
+  "Copy timed sessions from a mytime.db time-tracking database.
+The file option names the mytime.db; when it is unset or not a database,
+`writing-habit-track-mytime-db' is used."
+  (interactive (list (transient-args 'writing-habit-dispatch-track)))
+  (writing-habit-dispatch--require args "db")
+  (require 'writing-habit-track)
+  (let* ((path (writing-habit-dispatch--arg args "path"))
+         (source (if (and path (string-match-p "\\.db\\'" path))
+                     path
+                   (expand-file-name writing-habit-track-mytime-db))))
+    (writing-habit-dispatch-run-habit
+     (list "track" "sync" source)
+     (seq-filter (lambda (a) (string-match-p
+                              "\\`--\\(db\\|since\\|until\\|scope\\|table\\)=\\|\\`--dry-run\\'" a))
+                 args))))
+
 ;;;###autoload (autoload 'writing-habit-dispatch-track "writing-habit-dispatch" nil t)
 (transient-define-prefix writing-habit-dispatch-track ()
   "Record the effort you spent."
@@ -389,8 +407,14 @@ INITIAL-INPUT and HISTORY are passed to `completing-read'."
                      (concat "--day=" (writing-habit-dispatch--today)) "--format=csv")))
   ["Options"
    (writing-habit-dispatch--db)
-   ("-f" "Actuals or org file" "--path=" :reader transient-read-existing-file)
+   ("-f" "Actuals, org, or mytime.db file" "--path=" :reader transient-read-existing-file)
    ("-F" "Format" "--format=" :choices ("csv" "ics"))]
+  ["Sync from mytime.db"
+   ("-S" "Scope" "--scope=" :choices ("semester" "legend" "all"))
+   ("-b" "Since (first day)" "--since=" :reader writing-habit-dispatch--read-date)
+   ("-u" "Until (last day)" "--until=" :reader writing-habit-dispatch--read-date)
+   ("-T" "Table for weeks with no plan" "--table=" :reader transient-read-existing-file)
+   ("-y" "Dry run, write nothing" "--dry-run")]
   ["Session"
    ("-D" "Day" "--day=" :reader writing-habit-dispatch--read-date)
    ("-p" "Project code" "--project=")
@@ -402,7 +426,8 @@ INITIAL-INPUT and HISTORY are passed to `completing-read'."
   ["Run"
    ("i" "track import" writing-habit-dispatch--track-import)
    ("a" "track add" writing-habit-dispatch--track-add)
-   ("k" "harvest org clocks" writing-habit-dispatch--harvest)])
+   ("k" "harvest org clocks" writing-habit-dispatch--harvest)
+   ("y" "track sync from mytime.db" writing-habit-dispatch--track-sync)])
 
 ;;;; Compare
 

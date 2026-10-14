@@ -71,6 +71,7 @@
            "but the writing-schedule.el on the load path is older")))
 (require 'writing-habit-name)
 (require 'writing-habit-plan)
+(require 'writing-habit-lists)
 
 ;;;; Constants
 
@@ -96,15 +97,17 @@ This mirrors the section rule of the scheduler parser.")
 
 (defconst writing-habit-table-project-codes
   (append (mapcar #'char-to-string (number-sequence ?A ?Z))
+          (mapcar #'char-to-string (number-sequence ?0 ?9))
           (mapcan (lambda (a)
                     (mapcar (lambda (b) (string a b)) (number-sequence ?A ?Z)))
                   (number-sequence ?A ?Z)))
   "The codes offered to a new project, in order.
-The 26 single letters come first, and the two-letter codes AA to ZZ
-follow, as the columns of a spreadsheet do, so a legend can hold up to
-702 projects.  Both readers accept a code of up to four characters, so a
-two-letter code works in the grid and in the legend.  Only the file name
-is limited to single letters.")
+The 26 single letters come first, then the ten digits 0 to 9, and then
+the two-letter codes AA to ZZ, as the columns of a spreadsheet do.  The 36
+one-character codes are the ones a table file name can carry, so they are
+used up first.  Both readers accept a code of up to four characters, so a
+two-letter code works in the grid and in the legend, but not in the file
+name.")
 
 (defconst writing-habit-table--month
   "\\(?:jan\\|feb\\|mar\\|apr\\|may\\|jun\\|jul\\|aug\\|sep\\|oc\\|nov\\|dec\\)[a-z]*\\.?"
@@ -189,11 +192,11 @@ expect the risk tag at the end of the cell."
   "The section name the scheduler gives an activity named by a cell or a default.")
 
 (defconst writing-habit-table-cell-re
-  "\\`\\([ges]\\)\\([A-Z][A-Z0-9]\\{0,3\\}\\)\\'"
-  "A day cell with an activity letter before the code, such as gA or sEM.
+  (concat "\\`\\([ges]\\)\\(" writing-habit-name-code-re "\\)\\'")
+  "A day cell with an activity letter before its code, as in gA, sEM, or g3.
 The letter counts only when it is lowercase and the code starts with a
-capital, so a cell typed all in lowercase is a code.  This is the rule of
-`writing-schedule-split-cell'.")
+capital or is a digit, so a cell typed all in lowercase is a code.
+This is the rule of `writing-schedule-split-cell'.")
 
 (defun writing-habit-table-split-cell (text)
   "Return (LETTER . CODE) for the day cell TEXT.
@@ -628,10 +631,10 @@ header."
 
 (defun writing-habit-table-next-free-code (table)
   "Return the first code used by neither the legend nor the grid of TABLE.
-The single letters are offered first.  Once all 26 are taken, the
-two-letter codes follow in the order AA, AB, and so on to ZZ, so a
-legend is no longer capped at 26 projects.  An empty string means every
-one of the 702 codes is taken."
+The single letters are offered first, then the digits 0 to 9.  Once all
+36 are taken, the two-letter codes follow in the order AA, AB, and so on
+to ZZ, so a legend is no longer capped at 36 projects.  An empty string
+means every one of the 712 codes is taken."
   (let ((taken (append (mapcar #'car (writing-habit-table-legend table))
                        (writing-habit-table-used-codes table))))
     (or (seq-find (lambda (code) (not (member code taken)))
@@ -950,6 +953,93 @@ code is defined twice, because the readers keep the first."
     (setf (writing-habit-table-dirty table) t)
     target))
 
+;;;; The legend, ordered and tidied
+
+(defun writing-habit-table-sort-legend (table)
+  "Order the legend rows of TABLE by project number.  Return non-nil on change.
+Only the legend rows trade places, so rules, the grid, and the lines
+around the table stay where they are.  The sort is stable, so projects
+without a number, such as email, keep their order at the end."
+  (let* ((indexes (writing-habit-table-legend-rows table))
+         (current (mapcar (lambda (i) (writing-habit-table-row-at table i)) indexes))
+         (ordered (seq-sort-by
+                   (lambda (row)
+                     (writing-habit-name-number-key
+                      (car (writing-habit-name-split-deadline
+                            (nth 1 (writing-habit-table-row-parsed row))))))
+                   #'writing-habit-name-key< current)))
+    (unless (equal ordered current)
+      (let ((rows (writing-habit-table-rows table)))
+        (cl-mapc (lambda (i row) (setf (nth i rows) row)) indexes ordered))
+      (setf (writing-habit-table-dirty table) t)
+      t)))
+
+(defun writing-habit-table-copy-entry-to-legend (table entry)
+  "Add the project of the list ENTRY to the legend of TABLE.
+ENTRY is a `writing-habit-lists-entry'.  It keeps its code when the
+legend does not use it yet, and otherwise takes the first free code.
+Signal an error when the legend already names the project.  Return the
+new legend row."
+  (let ((project (writing-habit-lists-entry-project entry))
+        (legend (writing-habit-table-legend table)))
+    (dolist (item legend)
+      (when (equal (car (writing-habit-name-split-deadline (cadr item))) project)
+        (error "%s is already in the legend as %s" project (car item))))
+    (let ((code (if (and (writing-habit-lists-entry-code entry)
+                         (not (assoc (writing-habit-lists-entry-code entry) legend)))
+                    (writing-habit-lists-entry-code entry)
+                  (writing-habit-table-next-free-code table))))
+      (writing-habit-table-add-legend table code
+                                      (writing-habit-lists-entry-description entry)
+                                      (writing-habit-lists-entry-risk entry)
+                                      (writing-habit-lists-entry-activity entry)))))
+
+(defun writing-habit-table-tidy-legend (table &optional reference apply)
+  "Split every legend description of TABLE into a project and a deadline.
+Return one list (ROW CODE OLD PROJECT DEADLINE DROPPED) per entry the
+change would rewrite.  With APPLY the rows are rewritten, keeping each
+risk tag and default activity.  REFERENCE is the absolute day that
+guesses a missing year.  See `writing-habit-name-tidy-description'."
+  (let ((changes '()))
+    (dolist (index (writing-habit-table-legend-rows table))
+      (let* ((parsed (writing-habit-table-row-parsed (writing-habit-table-row-at table index)))
+             (code (nth 0 parsed)) (description (or (nth 1 parsed) "")) (risk (nth 2 parsed))
+             (tidy (writing-habit-name-tidy-description description reference))
+             (new (writing-habit-name-join-deadline (nth 0 tidy) (nth 1 tidy))))
+        (unless (equal new (string-trim description))
+          (push (list index code description (nth 0 tidy) (nth 1 tidy) (nth 2 tidy)) changes)
+          (when apply
+            (writing-habit-table-set-legend table index code new risk)))))
+    (nreverse changes)))
+
+;;;; The semester project lists
+
+(defun writing-habit-table-list-entries (table name)
+  "Return the entries of the semester list NAME that follows TABLE."
+  (writing-habit-lists-entries (writing-habit-table-after table) name))
+
+(defun writing-habit-table--set-after (table lines)
+  "Give TABLE the trailing LINES and mark it changed when they differ."
+  (unless (equal lines (writing-habit-table-after table))
+    (setf (writing-habit-table-after table) lines
+          (writing-habit-table-dirty table) t)))
+
+(defun writing-habit-table-sort-list (table name)
+  "Order the semester list NAME of TABLE by project number.
+Return non-nil on change."
+  (let ((result (writing-habit-lists-sort (writing-habit-table-after table) name)))
+    (writing-habit-table--set-after table (car result))
+    (cdr result)))
+
+(defun writing-habit-table-complete-entry (table position)
+  "Move row POSITION of the current semester list of TABLE to the completed list.
+Return the entry moved."
+  (let ((result (writing-habit-lists-transfer
+                 (writing-habit-table-after table) writing-habit-lists-current
+                 position writing-habit-lists-completed)))
+    (writing-habit-table--set-after table (car result))
+    (cdr result)))
+
 ;;;; Derived readings
 
 (defun writing-habit-table-rows-clear-of (table row-index)
@@ -1013,7 +1103,7 @@ Each day lists (CATEGORY . LETTER) for its blocks in time order."
 
 (defun writing-habit-table-code (table)
   "Return the canonical schedule code of TABLE's grid.
-Signal an error when a cell holds a code of more than one letter."
+Signal an error when a cell holds a code of more than one character."
   (writing-habit-name-encode (writing-habit-table-week table)))
 
 (defun writing-habit-table-code-or-problem (table)
@@ -1023,8 +1113,9 @@ Signal an error when a cell holds a code of more than one letter."
     (error
      (let ((reason (error-message-string err)))
        (when (string-match-p "one uppercase letter" reason)
-         (setq reason (concat reason ".  Give that project a single-letter alias "
-                              "for the file name, and keep its full code in the legend.")))
+         (setq reason (concat reason ".  Give that project a one-character alias, "
+                              "a letter or a digit, for the file name, and keep its "
+                              "full code in the legend.")))
        (cons nil reason)))))
 
 (defun writing-habit-table-name-matches-code (table)
