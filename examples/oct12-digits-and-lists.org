@@ -1,0 +1,36 @@
+#+TITLE: Writing schedule October 12-18
+# An example week that uses digit codes beside letters and keeps the
+# semester project lists after the weekly table.
+| Time <l>    | M   | Tu  | W   | Th  | F   | Sa  | Su  |
+|-------------+-----+-----+-----+-----+-----+-----+-----|
+| 05:00-06:30 | gZ  | g3  | gZ  | g3  | gH  |     |     |
+| 06:30-07:30 | e7  | eH  | e7  | sF  | e3  |     |     |
+| 08:00-09:00 | sF  |     | s0  |     |     | g7  | gZ  |
+|-------------+-----+-----+-----+-----+-----+-----+-----|
+| Z: 1008ToolsForQCrOfRNA, submitted October 5 :safe: | | | | | | | |
+| H: 0104BaGquadShelxD November 15 :safe:            | | | | | | | |
+| 3: 0374qflip 2026-12-01 :risky:                    | | | | | | | |
+| F: 4072UsersMeeting2026 Sep 16, 0382CCinJN :safe:  | | | | | | | |
+| 7: 0201dusp1 Jan 9 :safe:                          | | | | | | | |
+| 0: 6005EveningCommute                              | | | | | | | |
+
+* Current semester projects
+#+NAME: current-semester-projects
+| H: 0104BaGquadShelxD 2026-11-15 :safe:        |
+| 3: 0374qflip 2026-12-01 :risky:               |
+| - 0920ReviewForJBC                           |
+| Z: 1008ToolsForQCrOfRNA 2026-10-05 :safe:     |
+| 7: 0201dusp1 2027-01-09 :safe:                |
+
+* Completed this semester
+#+NAME: completed-this-semester
+| A: 0050OldPaper 2026-09-01 :safe: |
+
+* Next semester projects
+#+NAME: next-semester-projects
+| - 2210GrantRenewal 2027-02-01 :risky: |
+| - 1500BookChapter                     |
+
+* Next next semester projects
+#+NAME: next-next-semester-projects
+| - 3300Review2027 |
