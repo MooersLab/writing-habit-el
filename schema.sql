@@ -334,3 +334,92 @@ JOIN v_week_overall o ON o.week_start = w.week_start
 WHERE w.schedule_code IS NOT NULL
 GROUP BY w.schedule_code
 ORDER BY w.schedule_code;
+
+-- ---------------------------------------------------------------------------
+-- Work intensity (build step 5). What a block was for, and how it went.
+-- Both tables are keyed by the planned block, as its day, start time, and
+-- project code, and never by a session row. Track sync inserts and updates
+-- session rows only, so a rerun can never overwrite a review or an objective.
+-- The code is plain text rather than a project id, so objectives can be set
+-- for a week before plan import has created its project rows.
+-- ---------------------------------------------------------------------------
+
+-- One to three objectives committed to a planned block, checked off when met.
+CREATE TABLE IF NOT EXISTS block_objective (
+    objective_id INTEGER PRIMARY KEY,
+    day          TEXT    NOT NULL,                -- ISO date of the block
+    start_time   TEXT    NOT NULL,                -- HH:MM start of the block
+    code         TEXT    NOT NULL,                -- legend code of the project
+    position     INTEGER NOT NULL DEFAULT 0,
+    text         TEXT    NOT NULL,
+    done         INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0,1)),
+    done_at      TEXT,
+    origin       TEXT    NOT NULL DEFAULT 'typed'
+                  CHECK (origin IN ('typed','grasscatcher','ai')),
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    week_start   TEXT GENERATED ALWAYS AS (
+        date(day, '-' || ((CAST(strftime('%w', day) AS INTEGER) + 6) % 7) || ' days')
+    ) VIRTUAL
+);
+
+-- The thirty-second review written when a block ends. objectives_committed and
+-- objectives_met are copied from block_objective when the block has objectives,
+-- and typed by hand when it has none. focus is a 1 to 5 self-rating.
+CREATE TABLE IF NOT EXISTS session_review (
+    review_id            INTEGER PRIMARY KEY,
+    day                  TEXT    NOT NULL,
+    start_time           TEXT    NOT NULL,
+    code                 TEXT    NOT NULL,
+    source_ref           TEXT,                    -- optional link to a tracked session
+    objectives_committed INTEGER CHECK (objectives_committed >= 0),
+    objectives_met       INTEGER CHECK (objectives_met >= 0),
+    focus                INTEGER CHECK (focus BETWEEN 1 AND 5),
+    interruptions        INTEGER CHECK (interruptions >= 0),
+    output_units         TEXT,                    -- free text, such as 600 words
+    next_step            TEXT,                    -- where to start next time
+    note                 TEXT,
+    debrief              TEXT,                    -- the coaching text, when asked for
+    created_at           TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at           TEXT    NOT NULL DEFAULT (datetime('now')),
+    week_start           TEXT GENERATED ALWAYS AS (
+        date(day, '-' || ((CAST(strftime('%w', day) AS INTEGER) + 6) % 7) || ' days')
+    ) VIRTUAL,
+    UNIQUE (day, start_time, code)
+);
+
+CREATE INDEX IF NOT EXISTS ix_objective_block ON block_objective(day, start_time, code);
+CREATE INDEX IF NOT EXISTS ix_review_week     ON session_review(week_start);
+
+-- Review totals per week: blocks reviewed, objectives met of those committed,
+-- mean focus, and interruptions. Feeds the done list and the personal bests.
+CREATE VIEW IF NOT EXISTS v_week_review AS
+SELECT  week_start,
+        COUNT(*)                          AS reviews,
+        SUM(COALESCE(objectives_committed,0)) AS committed,
+        SUM(COALESCE(objectives_met,0))   AS met,
+        ROUND(AVG(focus), 2)              AS mean_focus,
+        SUM(COALESCE(interruptions,0))    AS interruptions
+FROM session_review
+GROUP BY week_start
+ORDER BY week_start;
+
+-- ---------------------------------------------------------------------------
+-- The coach (build step 6). Every request to the local language model, with
+-- the facts sent and the reply, so the writer can see exactly what left the
+-- database. accepted is 1 when the writer took the suggestion, 0 when they
+-- discarded it, and null when they did neither. week_start is the planning
+-- week the call served, which lets the dashboard compare weeks with and
+-- without the coach.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ai_log (
+    log_id     INTEGER PRIMARY KEY,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    task       TEXT    NOT NULL,                  -- objectives, grasscatcher, debrief, weeks, size
+    source     TEXT    NOT NULL,                  -- the model, or the plain summary and why
+    facts      TEXT    NOT NULL,
+    reply      TEXT,
+    accepted   INTEGER CHECK (accepted IN (0,1)),
+    week_start TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_ai_log_week ON ai_log(week_start);

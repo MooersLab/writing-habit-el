@@ -27,6 +27,7 @@ MODULES = writing-habit-db.el \
           writing-habit-table-auto.el \
           writing-habit-table-mode.el \
           writing-habit-dispatch.el \
+          writing-habit-coach.el \
           writing-habit.el
 
 TESTS = test/writing-habit-name-tests.el \
@@ -41,7 +42,8 @@ TESTS = test/writing-habit-name-tests.el \
         test/writing-habit-history-tests.el \
         test/writing-habit-table-tests.el \
         test/writing-habit-table-mode-tests.el \
-        test/writing-habit-dispatch-tests.el
+        test/writing-habit-dispatch-tests.el \
+        test/writing-habit-coach-tests.el
 
 LOADPATH = -L . $(if $(WRITING_SCHEDULE_DIR),-L $(WRITING_SCHEDULE_DIR),)
 TESTLOAD = $(foreach t,$(TESTS),-l $(t))
