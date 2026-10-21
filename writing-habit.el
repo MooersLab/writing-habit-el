@@ -5,7 +5,7 @@
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Version: 0.0.0
-;; Package-Requires: ((emacs "29.1") (transient "0.4") (writing-schedule "0.5.0"))
+;; Package-Requires: ((emacs "29.1") (transient "0.4") (writing-schedule "0.6.0"))
 ;; Keywords: convenience, tools, org
 ;; URL: https://github.com/MooersLab/writing-habit-el
 ;; SPDX-License-Identifier: GPL-3.0-or-later

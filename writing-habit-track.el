@@ -66,6 +66,7 @@
 (require 'writing-habit-db)
 (require 'writing-habit-name)
 (require 'writing-habit-lists)
+(require 'writing-habit-columns)
 
 (declare-function org-mode "org" ())
 (declare-function org-back-to-heading "org" (&optional invisible-ok))
@@ -437,11 +438,14 @@ number appears under two codes the first code wins."
 A project counts while it is on the current list and after it moves to
 the completed list, because late work on a finished project is still
 writing."
-  (let ((lines (with-temp-buffer
-                 (insert-file-contents table-path)
-                 (split-string (buffer-string) "\n")))
+  (let ((lines (plist-get (writing-habit-columns-to-one-cell
+                          (with-temp-buffer
+                            (insert-file-contents table-path)
+                            (split-string (buffer-string) "\n")))
+                         :lines))
         (found '()))
-    (dolist (name (list writing-habit-lists-current writing-habit-lists-completed))
+    (dolist (name (list writing-habit-lists-current "carried-over-projects"
+                        writing-habit-lists-completed))
       (dolist (entry (writing-habit-lists-entries lines name))
         (dolist (n (writing-habit-track-project-numbers
                     (writing-habit-lists-entry-description entry)))

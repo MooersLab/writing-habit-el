@@ -236,6 +236,44 @@ list when it is missing. `S` sorts the list at point by project number. The
 lists are the same tables the Python GUI shows as tabs beside "This week", so
 either tool edits them.
 
+## Project tables in columns
+
+The legend and the lists may also be kept as tables with one column per
+field, the layout the Python editor writes:
+
+```org
+#+NAME: This week
+| Code | Project Number | Project Name | Deadline   | Risk tag | Default activity |
+|------+----------------+--------------+------------+----------+------------------|
+| B:   | 1006           | AIrxOpt      | 2026-12-15 | :safe:   | editing          |
+
+#+NAME: current-semester-projects
+#+CAPTION: Fall 2026 projects
+| Code | Project Number | Project Name | Deadline   | Risk tag | Default activity |
+|------+----------------+--------------+------------+----------+------------------|
+| -    | 1452           | PHFSboXt     | 2027-03-01 | :risky:  |                  |
+
+#+NAME: grasscatcher
+#+CAPTION: Grasscatcher
+| Code | Project Number | Project Name | Priority | Task               |
+|------+----------------+--------------+----------+--------------------|
+| B:   | 1006           | AIrxOpt      | [#A1]    | Read the reviews.  |
+```
+
+A table is read in columns when its first row starts with `Code`. The
+`This week` table is the legend, so the week grid needs no legend rows
+below it. The `#+NAME:` line holds the list's key, and the `#+CAPTION:`
+line holds the title of its tab. A `#+NAME:` that holds a plain title,
+such as `Current semester projects`, is found under its key too.
+
+The mode reads every table into the one-cell model and keeps track of
+which file line holds each row, so the commands work on the rows you
+see. A file you did not change saves byte for byte. After an edit, the
+week grid is written as before and every project table is written back
+in columns, with its caption kept. writing-schedule 0.6.0 or newer reads
+the `This week` table when it builds the calendar, and a Default activity
+there counts as the `@` tag of the legend.
+
 ## How edits keep the file intact
 
 Every edit goes through the model in `writing-habit-table.el`, a buffer-free

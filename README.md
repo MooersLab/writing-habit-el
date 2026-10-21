@@ -49,7 +49,7 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 
 - GNU Emacs 29.1 or newer, built with SQLite support. The package checks `sqlite-available-p` and reports a clear message when SQLite is missing.
 - `transient` 0.4 or newer, which ships with Emacs 28 and later.
-- `writing-schedule.el` 0.3.1 or newer (0.5.0 or newer to read the digit project codes 0 to 9), for `plan import`, the table editing mode, and the scheduler groups of the menu. The tracker commands load it lazily, so they still run without it.
+- `writing-schedule.el` 0.3.1 or newer (0.5.0 or newer to read the digit project codes 0 to 9, and 0.6.0 or newer to read project tables in columns), for `plan import`, the table editing mode, and the scheduler groups of the menu. The tracker commands load it lazily, so they still run without it.
 - Optional: `python3` with `matplotlib`, needed only for the comparison plot. The HTML dashboard is pure Emacs Lisp and needs no Python.
 
 ## Installation

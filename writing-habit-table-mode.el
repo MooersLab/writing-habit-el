@@ -169,10 +169,27 @@ as after a hand edit.  Emacs 31 renamed the function that does this."
     (setf (writing-habit-table-synced-codes model) writing-habit-table--synced)
     model))
 
+(defun writing-habit-table--model-line-at-point (model)
+  "Return the model line of MODEL shown on the line at point, or nil.
+In a file that keeps its legend and lists in columns the buffer shows
+other lines than the one-cell model holds; the model's line map links
+the two."
+  (writing-habit-table-model-line model (1- (line-number-at-pos))))
+
+(defun writing-habit-table--goto-model-line (line)
+  "Move point to the buffer line that shows model LINE of the buffer's table.
+The table is read again from the buffer, so the map is the one of the
+text now shown, which an edit may have just rewritten."
+  (let* ((fresh (writing-habit-table-current))
+         (file-line (or (writing-habit-table-file-line fresh line) line)))
+    (goto-char (point-min))
+    (forward-line file-line)))
+
 (defun writing-habit-table--row-at-point (model)
   "Return the model row index of the line at point in MODEL, or nil."
-  (let ((index (- (line-number-at-pos) 1 (length (writing-habit-table-before model)))))
-    (when (and (>= index 0) (< index (length (writing-habit-table-rows model))))
+  (let* ((line (writing-habit-table--model-line-at-point model))
+         (index (and line (- line (length (writing-habit-table-before model))))))
+    (when (and index (>= index 0) (< index (length (writing-habit-table-rows model))))
       index)))
 
 (defun writing-habit-table--cell-at-point ()
@@ -187,8 +204,7 @@ as after a hand edit.  Emacs 31 renamed the function that does this."
 
 (defun writing-habit-table--goto (model row &optional cell)
   "Move point to row ROW of MODEL, inside CELL when CELL is non-nil."
-  (goto-char (point-min))
-  (forward-line (+ row (length (writing-habit-table-before model))))
+  (writing-habit-table--goto-model-line (+ row (length (writing-habit-table-before model))))
   (when cell
     (let ((bound (line-end-position)))
       (when (search-forward "|" bound t (1+ cell))
@@ -476,22 +492,28 @@ Drop a blank row that this command added once its code leaves the grid."
 NAME is the list, and POSITION the row's place among its projects."
   (let* ((after-start (+ (length (writing-habit-table-before model))
                          (length (writing-habit-table-rows model))))
-         (index (- (line-number-at-pos) 1 after-start))
+         (line (writing-habit-table--model-line-at-point model))
+         (index (and line (- line after-start)))
          (lines (writing-habit-table-after model)))
-    (when (and (>= index 0) (< index (length lines)))
+    (when (and index (>= index 0) (< index (length lines)))
       (seq-some (lambda (name)
                   (let ((position (cl-position index (writing-habit-lists-row-indexes lines name))))
                     (and position (cons name position))))
                 (writing-habit-lists-names)))))
 
 (defun writing-habit-table--goto-list-row (model name position)
-  "Move point to row POSITION of the semester list NAME of MODEL."
-  (let ((index (nth position (writing-habit-lists-row-indexes
-                              (writing-habit-table-after model) name))))
+  "Move point to row POSITION of the semester list NAME of MODEL.
+The buffer's table is read again, so the row is found in the text now
+shown, whatever MODEL held before an edit rewrote it."
+  (ignore model)
+  (let* ((fresh (writing-habit-table-current))
+         (index (nth position (writing-habit-lists-row-indexes
+                               (writing-habit-table-after fresh) name))))
     (when index
       (goto-char (point-min))
-      (forward-line (+ index (length (writing-habit-table-before model))
-                       (length (writing-habit-table-rows model))))
+      (forward-line (let ((line (+ index (length (writing-habit-table-before fresh))
+                                   (length (writing-habit-table-rows fresh)))))
+                      (or (writing-habit-table-file-line fresh line) line)))
       (when (search-forward "|" (line-end-position) t)
         (skip-chars-forward " " (line-end-position))))))
 
@@ -666,7 +688,9 @@ Skip the work when neither the text nor point moved, unless FORCE."
               (save-excursion
                 (dolist (b (writing-habit-table-blocks model))
                   (goto-char (point-min))
-                  (forward-line (+ offset (writing-habit-table-block-row b)))
+                  (forward-line (or (writing-habit-table-file-line
+                                     model (+ offset (writing-habit-table-block-row b)))
+                                    0))
                   (let ((bounds (writing-habit-table--cell-bounds
                                  (writing-habit-table-block-column b))))
                     (when bounds
@@ -678,7 +702,7 @@ Skip the work when neither the text nor point moved, unless FORCE."
             (save-excursion
               (dolist (rc (writing-habit-table-conflicting-cells model))
                 (goto-char (point-min))
-                (forward-line (+ offset (car rc)))
+                (forward-line (or (writing-habit-table-file-line model (+ offset (car rc))) 0))
                 (let ((b (writing-habit-table--cell-bounds (cdr rc))))
                   (when b (writing-habit-table--overlay (car b) (cdr b)
                                                         'writing-habit-table-clash 20)))))
@@ -688,7 +712,7 @@ Skip the work when neither the text nor point moved, unless FORCE."
                 (save-excursion
                   (dolist (r (writing-habit-table-rows-clear-of model row))
                     (goto-char (point-min))
-                    (forward-line (+ offset r))
+                    (forward-line (or (writing-habit-table-file-line model (+ offset r)) 0))
                     (writing-habit-table--overlay (line-beginning-position) (line-end-position)
                                                   'writing-habit-table-clear 10)))))
             (force-mode-line-update)))))))

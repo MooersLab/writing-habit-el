@@ -4,17 +4,19 @@
 #   make compile   byte-compile every module, treating warnings as failures
 #   make clean     remove byte-compiled files
 #
-# The plan-import tests need writing-schedule.el.  Point WRITING_SCHEDULE_DIR
-# at its checkout to include them; otherwise those tests skip themselves.
+# Most tests need writing-schedule.el.  The Makefile uses a checkout in
+# ../writing-schedule when there is one.  Point WRITING_SCHEDULE_DIR at
+# another checkout to use that one; without any, those tests skip themselves.
 #
 #   make test WRITING_SCHEDULE_DIR=/path/to/writing-schedule
 
 EMACS ?= emacs
-WRITING_SCHEDULE_DIR ?=
+WRITING_SCHEDULE_DIR ?= $(wildcard ../writing-schedule)
 
 MODULES = writing-habit-db.el \
           writing-habit-name.el \
           writing-habit-lists.el \
+          writing-habit-columns.el \
           writing-habit-plan.el \
           writing-habit-track.el \
           writing-habit-compare.el \
@@ -32,6 +34,7 @@ MODULES = writing-habit-db.el \
 
 TESTS = test/writing-habit-name-tests.el \
         test/writing-habit-lists-tests.el \
+        test/writing-habit-columns-tests.el \
         test/writing-habit-db-tests.el \
         test/writing-habit-plan-tests.el \
         test/writing-habit-track-tests.el \

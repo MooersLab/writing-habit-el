@@ -64,8 +64,30 @@
 (defconst writing-habit-lists-completed "completed-this-semester"
   "The list of the projects finished this semester.")
 
-(defconst writing-habit-lists--name-re "\\`[ \t]*#\\+NAME:[ \t]*\\([^ \t]+\\)[ \t]*\\'"
-  "An org #+NAME: line, with the name in group 1.")
+(defconst writing-habit-lists--name-re "\\`[ \t]*#\\+NAME:[ \t]*\\(.*?\\)[ \t]*\\'"
+  "An org #+NAME: line, with the name in group 1.  A name may hold spaces.")
+
+(defun writing-habit-lists-normalize-title (text)
+  "Return the table name or tab title TEXT in a form two spellings share.
+Case, repeated spaces, a final colon, and a trailing count such as (26)
+or (1 of 3) are ignored.  A tab title such as Current semester projects
+gives the name of its list, so a list named by its title is found."
+  (let* ((text (replace-regexp-in-string
+                "[ \t]*([0-9]+\\(?:[ \t]+of[ \t]+[0-9]+\\)?)[ \t]*\\'" "" (or text "")))
+         (text (downcase (string-trim (string-remove-suffix
+                                       ":" (string-trim (replace-regexp-in-string
+                                                         "[ \t]+" " " text)))))))
+    (or (car (seq-find (lambda (pair) (string= (downcase (cdr pair)) text))
+                       (writing-habit-lists-names-all)))
+        text)))
+
+(defun writing-habit-lists-names-all ()
+  "Return (NAME . TITLE) for every list, including the two the Python editor added.
+These are the carried-over projects of the last roll forward and the
+grasscatcher of tasks."
+  (append writing-habit-lists
+          '(("carried-over-projects" . "Carried over")
+            ("grasscatcher" . "Grasscatcher"))))
 
 (defconst writing-habit-lists--risk-tag '(("safe" . "safe") ("speculative" . "risky"))
   "The tag written for each risk class.")
@@ -147,7 +169,8 @@ RISK is a class name, safe or speculative, and ACTIVITY a default activity."
   "Return the index in LINES of the #+NAME: line of list NAME, or nil."
   (cl-position-if (lambda (line)
                     (and (string-match writing-habit-lists--name-re line)
-                         (string= (downcase (match-string 1 line)) name)))
+                         (string= (writing-habit-lists-normalize-title (match-string 1 line))
+                                  name)))
                   lines))
 
 (defun writing-habit-lists--span (lines name)
@@ -305,7 +328,8 @@ project, in which case it only leaves SOURCE."
 A project counts while it is on the current list and after it moves to
 the completed list."
   (let ((found '()))
-    (dolist (name (list writing-habit-lists-current writing-habit-lists-completed))
+    (dolist (name (list writing-habit-lists-current "carried-over-projects"
+                        writing-habit-lists-completed))
       (dolist (entry (writing-habit-lists-entries lines name))
         (dolist (token (writing-habit-name--project-tokens
                         (concat " " (writing-habit-lists-entry-description entry))))

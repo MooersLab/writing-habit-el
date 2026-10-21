@@ -200,6 +200,17 @@ table and returns new lines, so the caller decides when to write.
 | `writing-habit-lists-sort`, `-transfer` | function | Sort a list by project number, and move an entry to another list. |
 | `writing-habit-lists-semester-numbers` | function | The project numbers on the current and completed lists. |
 
+## writing-habit-columns
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `writing-habit-columns-project-cell`, `-task-cell` | function | The one-cell form of a row of columns. |
+| `writing-habit-columns-project-columns`, `-task-columns` | function | The columns of a row given in the one-cell form. |
+| `writing-habit-columns-read-table` | function | `(COLUMNAR . ROWS)` for the lines of one table, in either layout. |
+| `writing-habit-columns-to-one-cell` | function | Every table of a file in columns read into the one-cell form. |
+| `writing-habit-columns-to-columns` | function | The lists and the This week table written back in columns. |
+| `writing-habit-columns-render` | function | An aligned org table from a header and rows. |
+
 ## Configuration
 
 | Variable | Default | Meaning |

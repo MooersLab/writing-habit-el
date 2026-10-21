@@ -72,6 +72,7 @@
 (require 'writing-habit-name)
 (require 'writing-habit-plan)
 (require 'writing-habit-lists)
+(require 'writing-habit-columns)
 
 ;;;; Constants
 
@@ -229,8 +230,17 @@ A valid activity letter is kept and the code is raised to capitals."
 ROWS is the list of table lines.  COLUMNS lists (CELL-INDEX OFFSET LABEL)
 for every day column.  BEFORE and AFTER hold the lines around the table.
 SYNCED-CODES are the codes whose legend row `writing-habit-table-sync-legend'
-added, the only rows it ever drops again."
-  path rows columns before after dirty synced-codes)
+added, the only rows it ever drops again.
+
+COLUMNAR is non-nil for a file that keeps its legend and lists as tables
+in columns; see writing-habit-columns.el.  The model then still holds the
+one-cell form, and ORIGINAL, LOADED, and LINE-MAP let it write the file
+back in columns: ORIGINAL is the text read, LOADED the model's one-cell
+text as read, and LINE-MAP a vector giving the file line of each model
+line, or nil for a line the file does not have.  TASKS names the project
+of each grasscatcher code, as the file gave it."
+  path rows columns before after dirty synced-codes
+  columnar original loaded line-map tasks)
 
 (cl-defstruct (writing-habit-table-block
                (:constructor writing-habit-table-block-create)
@@ -358,7 +368,61 @@ applies the same rule."
           (writing-habit-table-columns table) columns
           (writing-habit-table-before table) (nreverse before)
           (writing-habit-table-after table) (nreverse after))
+    (writing-habit-table--read-columns table text)
     table))
+
+(defun writing-habit-table--read-columns (table text)
+  "Read the tables TABLE keeps in columns into its one-cell model.
+TEXT is the file text TABLE was read from."
+  (let* ((before (length (writing-habit-table-before table)))
+         (grid (length (writing-habit-table-rows table)))
+         (read (writing-habit-columns-to-one-cell (writing-habit-table-after table)
+                                                  (+ before grid))))
+    (when (plist-get read :found)
+      (let ((rows (writing-habit-table-rows table))
+            (map (append (number-sequence 0 (1- (+ before grid))) nil)))
+        (setf (writing-habit-table-columnar table) t
+              (writing-habit-table-tasks table) (plist-get read :tasks)
+              (writing-habit-table-after table) (plist-get read :lines))
+        (when (plist-get read :legend)
+          (unless (eq (writing-habit-table-row-kind (car (last rows))) 'rule)
+            (let ((rule (seq-find (lambda (r) (eq (writing-habit-table-row-kind r) 'rule)) rows)))
+              (when rule
+                (setq rows (append rows (list (writing-habit-table-row-create
+                                               :kind 'rule
+                                               :raw (writing-habit-table-row-raw rule)))))
+                (setq map (append map (list nil))))))
+          (let ((have '()))
+            (cl-loop for cell in (plist-get read :legend)
+                     for source in (plist-get read :legend-sources)
+                     for parsed = (writing-habit-name-parse-legend-cell cell)
+                     when (and parsed (not (member (car parsed) have)))
+                     do (let ((line (format "| %s |" cell)))
+                          (push (car parsed) have)
+                          (setq rows (append rows (list (writing-habit-table-row-create
+                                                         :kind 'legend :raw line
+                                                         :cells (writing-schedule-split-row line)
+                                                         :parsed parsed))))
+                          (setq map (append map (list source)))))))
+        (setf (writing-habit-table-rows table) rows
+              (writing-habit-table-line-map table)
+              (vconcat map (plist-get read :sources))
+              (writing-habit-table-original table) text
+              (writing-habit-table-loaded table) (writing-habit-table--model-text table))))))
+
+(defun writing-habit-table-file-line (table model-line)
+  "Return the file line of MODEL-LINE of TABLE, both counted from zero, or nil.
+A model line is a line of the before part, the rows, and the after part
+in turn.  In the one-cell layout the two are the same."
+  (let ((map (writing-habit-table-line-map table)))
+    (if (null map) model-line
+      (and (>= model-line 0) (< model-line (length map)) (aref map model-line)))))
+
+(defun writing-habit-table-model-line (table file-line)
+  "Return the model line of TABLE shown on FILE-LINE, or nil."
+  (let ((map (writing-habit-table-line-map table)))
+    (if (null map) file-line
+      (cl-position file-line map))))
 
 (defun writing-habit-table-from-file (path)
   "Return a table document read from the file at PATH."
@@ -371,15 +435,54 @@ applies the same rule."
 
 ;;;; Writing
 
-(defun writing-habit-table-to-text (table)
-  "Return the file text of TABLE.
-An untouched document returns its input byte for byte, apart from a final
-newline that a file without one gains."
+(defun writing-habit-table--model-text (table)
+  "Return TABLE in the one-cell form, the model every edit changes."
   (let ((parts (append (writing-habit-table-before table)
                        (mapcar #'writing-habit-table-row-raw
                                (writing-habit-table-rows table))
                        (writing-habit-table-after table))))
     (if parts (concat (mapconcat #'identity parts "\n") "\n") "")))
+
+(defun writing-habit-table--task-projects (table)
+  "Return (CODE . (NUMBER . NAME)) for the grasscatcher columns of TABLE.
+The legend wins, then the lists, then what the file itself gave."
+  (let ((out (copy-sequence (writing-habit-table-tasks table))))
+    (dolist (name (mapcar #'car (writing-habit-lists-names-all)))
+      (dolist (entry (writing-habit-lists-entries (writing-habit-table-after table) name))
+        (when (writing-habit-lists-entry-code entry)
+          (push (cons (writing-habit-lists-entry-code entry)
+                      (writing-habit-columns-split-project
+                       (writing-habit-lists-entry-project entry)))
+                out))))
+    (dolist (item (reverse (writing-habit-table-legend table)))
+      (push (cons (car item)
+                  (writing-habit-columns-split-project
+                   (car (writing-habit-table-split-due-date (cadr item)))))
+            out))
+    out))
+
+(defun writing-habit-table-to-text (table)
+  "Return the file text of TABLE.
+An untouched document returns its input byte for byte, apart from a final
+newline that a file without one gains.  A file in columns is written back
+in columns."
+  (cond
+   ((not (writing-habit-table-columnar table)) (writing-habit-table--model-text table))
+   ((equal (writing-habit-table--model-text table) (writing-habit-table-loaded table))
+    (writing-habit-table-original table))
+   (t
+    (let* ((rows (writing-habit-table-rows table))
+           (grid (mapcar #'writing-habit-table-row-raw
+                         (seq-remove (lambda (r) (eq (writing-habit-table-row-kind r) 'legend))
+                                     rows)))
+           (legend (mapcar (lambda (r) (car (writing-habit-table-row-cells r)))
+                           (seq-filter (lambda (r) (eq (writing-habit-table-row-kind r) 'legend))
+                                       rows)))
+           (after (writing-habit-columns-to-columns
+                   (writing-habit-table-after table) legend
+                   (writing-habit-table--task-projects table)))
+           (parts (append (writing-habit-table-before table) grid after)))
+      (if parts (concat (mapconcat #'identity parts "\n") "\n") "")))))
 
 (defun writing-habit-table-save (table &optional path)
   "Write TABLE to PATH, or to its own path, and return the path written."
@@ -387,6 +490,11 @@ newline that a file without one gains."
     (unless target (error "No path to save to"))
     (let ((coding-system-for-write 'utf-8-unix))
       (write-region (writing-habit-table-to-text table) nil target nil 'silent))
+    (when (writing-habit-table-columnar table)
+      (let ((again (writing-habit-table-from-file target)))
+        (setf (writing-habit-table-original table) (writing-habit-table-original again)
+              (writing-habit-table-loaded table) (writing-habit-table--model-text table)
+              (writing-habit-table-line-map table) (writing-habit-table-line-map again))))
     (setf (writing-habit-table-path table) target
           (writing-habit-table-dirty table) nil)
     target))

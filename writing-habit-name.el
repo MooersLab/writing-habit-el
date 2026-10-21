@@ -58,6 +58,7 @@
 ;;; Code:
 
 (require 'calendar)
+(require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
 
@@ -348,6 +349,40 @@ matches `read_legend' in the Python package."
               (when (and parsed (not (assoc (car parsed) legend)))
                 (push (cons (car parsed) (cdr parsed)) legend)))))
         (forward-line 1)))
+    (or (nreverse legend)
+        (writing-habit-name--this-week-legend table-path))))
+
+(declare-function writing-habit-columns-read-table "writing-habit-columns" (lines))
+
+(defun writing-habit-name--this-week-legend (table-path)
+  "Return the legend kept in its own table named This week in TABLE-PATH.
+The table may hold one-cell rows or columns (Code, Project Number,
+Project Name, and so on), as the editors write it.  The result has the
+shape of `writing-habit-name-read-legend'."
+  (require 'writing-habit-columns)
+  (let* ((lines (with-temp-buffer
+                  (insert-file-contents table-path)
+                  (split-string (buffer-string) "\n")))
+         (case-fold-search t)
+         (at (cl-position-if
+              (lambda (line)
+                (and (string-match "\\`[ \t]*#\\+NAME:[ \t]*\\(.*?\\)[ \t]*\\'" line)
+                     (member (downcase (replace-regexp-in-string
+                                        "[ \t]+" " " (match-string 1 line)))
+                             '("this week" "legend"))))
+              lines))
+         (legend '()))
+    (when at
+      (let ((block '()))
+        (catch 'done
+          (dolist (line (nthcdr (1+ at) lines))
+            (cond ((string-prefix-p "#+" (string-trim line)) nil)
+                  ((string-prefix-p "|" (string-trim line)) (push line block))
+                  (t (throw 'done nil)))))
+        (dolist (cell (cdr (writing-habit-columns-read-table (nreverse block))))
+          (let ((parsed (writing-habit-name-parse-legend-cell cell)))
+            (when (and parsed (not (assoc (car parsed) legend)))
+              (push (cons (car parsed) (cdr parsed)) legend))))))
     (nreverse legend)))
 
 (defun writing-habit-name-check-against-legend (decoded legend)
