@@ -138,5 +138,28 @@
                     (car (writing-habit-lists-entries lines "next-next-next-next-semester-projects")))
                    "7"))))
 
+(ert-deftest writing-habit-lists/seven-horizons-reach-two-years-out ()
+  "The two furthest lists are read, kept in horizon order, and show their titles.
+These match the lists of the Python editor, so a file edited in either
+package keeps the same lists."
+  (should (equal (last (writing-habit-lists-names) 2)
+                 '("next-next-next-next-next-semester-projects"
+                   "next-next-next-next-next-next-semester-projects")))
+  (let ((lines '("" "#+NAME: next-next-next-next-next-next-semester-projects"
+                 "#+CAPTION: Fall 2028 projects"
+                 "| Z: 1008ToolsForQCrOfRNA 2028-11-05 :safe: |"
+                 "" "#+NAME: next-next-next-next-next-semester-projects"
+                 "#+CAPTION: Summer 2028 projects"
+                 "| Y: 1008ToolsForQCrOfRNA 2028-11-05 :safe: |")))
+    (should (equal (writing-habit-lists-present lines)
+                   '("next-next-next-next-next-semester-projects"
+                     "next-next-next-next-next-next-semester-projects")))
+    (should (equal (writing-habit-lists-entry-code
+                    (car (writing-habit-lists-entries
+                          lines "next-next-next-next-next-next-semester-projects")))
+                   "Z"))
+    (should (equal (writing-habit-lists-normalize-title "6*Next semester projects (1)")
+                   "next-next-next-next-next-next-semester-projects"))))
+
 (provide 'writing-habit-lists-tests)
 ;;; writing-habit-lists-tests.el ends here

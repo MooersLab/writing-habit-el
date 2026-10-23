@@ -26,9 +26,10 @@
 
 ;;; Commentary:
 
-;; A weekly table file may carry up to six lists of projects after the
+;; A weekly table file may carry up to eight lists of projects after the
 ;; weekly table itself: the projects finished this semester, and one list
-;; per planning horizon, about two years ahead.  Each list is its own small
+;; per planning horizon.  The seven horizons reach six semesters, about two
+;; years, ahead.  Each list is its own small
 ;; org table, named by an org #+NAME: line:
 ;;
 ;;   #+NAME: current-semester-projects
@@ -55,7 +56,9 @@
     ("next-semester-projects" . "Next semester projects")
     ("next-next-semester-projects" . "Next next semester projects")
     ("next-next-next-semester-projects" . "3*Next semester projects")
-    ("next-next-next-next-semester-projects" . "4*Next semester projects"))
+    ("next-next-next-next-semester-projects" . "4*Next semester projects")
+    ("next-next-next-next-next-semester-projects" . "5*Next semester projects")
+    ("next-next-next-next-next-next-semester-projects" . "6*Next semester projects"))
   "Each list as (NAME . TITLE): the name in the file and the title shown.")
 
 (defconst writing-habit-lists-current "current-semester-projects"

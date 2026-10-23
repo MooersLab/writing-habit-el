@@ -194,7 +194,7 @@ table and returns new lines, so the caller decides when to write.
 
 | Symbol | Kind | What it does |
 |--------|------|--------------|
-| `writing-habit-lists` | constant | The six list names and their titles, nearest horizon first. |
+| `writing-habit-lists` | constant | The eight list names and their titles, nearest horizon first. |
 | `writing-habit-lists-entries`, `-present` | function | The entries of one list, and the lists a file holds. |
 | `writing-habit-lists-insert`, `-remove`, `-move`, `-set-entry` | function | Edit one list. |
 | `writing-habit-lists-sort`, `-transfer` | function | Sort a list by project number, and move an entry to another list. |

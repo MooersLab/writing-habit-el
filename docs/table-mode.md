@@ -220,6 +220,8 @@ named org tables after the weekly table, which the scheduler never reads:
 | `next-next-semester-projects` | the semester after that |
 | `next-next-next-semester-projects` | three semesters out |
 | `next-next-next-next-semester-projects` | four semesters out |
+| `next-next-next-next-next-semester-projects` | five semesters out |
+| `next-next-next-next-next-next-semester-projects` | six semesters out, about two years |
 
 ```org
 #+NAME: current-semester-projects
