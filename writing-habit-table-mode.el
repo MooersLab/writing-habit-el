@@ -857,7 +857,8 @@ the wrong plan shape."
 ;; which load when a command of the menu first runs.
 (dolist (command '(writing-habit-checks-coverage writing-habit-checks-energy
                    writing-habit-checks-energy-show writing-habit-checks-energy-from-reviews
-                   writing-habit-checks-rescue writing-habit-checks-partner
+                   writing-habit-checks-rescue writing-habit-checks-misses
+                   writing-habit-checks-plan-message writing-habit-checks-partner
                    writing-habit-checks-semester))
   (autoload command "writing-habit-checks" nil t))
 (dolist (command '(writing-habit-helpers-capture writing-habit-helpers-number-project
@@ -891,10 +892,12 @@ the wrong plan shape."
     ("e" "Match blocks to my energy" writing-habit-checks-energy)
     ("E" "Show the energy profile" writing-habit-checks-energy-show)
     ("R" "Rescue missed blocks" writing-habit-checks-rescue)
+    ("W" "Ask about missed blocks" writing-habit-checks-misses)
     ("k" "Capture to the grasscatcher" writing-habit-helpers-capture)
     ("#" "Number a new project" writing-habit-helpers-number-project)
     ("T" "Triage carried projects" writing-habit-helpers-triage-carried)
     ("u" "Find stuck projects" writing-habit-helpers-find-stuck)
+    ("M" "Monday message for my partner" writing-habit-checks-plan-message)
     ("f" "Summary for my partner" writing-habit-checks-partner)
     ("y" "Semester review" writing-habit-checks-semester)]
    ["Week"

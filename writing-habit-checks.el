@@ -33,6 +33,8 @@
 ;;   `writing-habit-checks-energy-show' the energy profile as a grid
 ;;   `writing-habit-checks-energy-from-reviews'  the profile from focus ratings
 ;;   `writing-habit-checks-rescue'      make up missed blocks or let them go
+;;   `writing-habit-checks-misses'      ask why each missed block was missed
+;;   `writing-habit-checks-plan-message' the Monday message for a partner
 ;;   `writing-habit-checks-partner'     the Friday summary for a partner
 ;;   `writing-habit-checks-semester'    a semester narrative for an annual report
 
@@ -1193,6 +1195,213 @@ or nil when no week of the semester has a plan."
                                               (writing-habit-checks--series quoted)))))))
     (string-join (list (string-join time " ") (string-join work " ")) "\n\n")))
 
+;;;; Why a block was missed (Rule 6)
+
+(defconst writing-habit-checks-miss-look-back 4
+  "Earlier weeks read for a repeat in the same slot.")
+
+(defun writing-habit-checks--weekday (iso)
+  "Return the weekday of the ISO date, 0 for Monday."
+  (mod (1- (calendar-day-of-week (calendar-gregorian-from-absolute
+                                  (writing-habit-checks--abs iso))))
+       7))
+
+(defun writing-habit-checks--ensure-miss-table (db)
+  "Create the block_miss table in DB when an older database lacks it."
+  (unless (member "block_miss" (writing-habit-checks--tables db))
+    (writing-habit-db-init db)))
+
+(defun writing-habit-checks-misses-find (db week-start &optional today)
+  "Return plists of the missed blocks of WEEK-START in DB, in time order.
+Each has :day :start :end :code :project :category :streak and :reason."
+  (writing-habit-checks--ensure-miss-table db)
+  (let* ((outcomes (writing-habit-checks-block-outcomes db week-start today))
+         (monday (writing-habit-checks--abs week-start))
+         (earlier (cl-loop for n from 1 to writing-habit-checks-miss-look-back
+                           collect (writing-habit-checks-block-outcomes
+                                    db (writing-habit-checks--iso (- monday (* 7 n))) week-start)))
+         (saved (sqlite-select db "SELECT day, start_time, code, reason FROM block_miss WHERE week_start = ?"
+                               (list week-start)))
+         (descriptions (sqlite-select db "SELECT code, description FROM project"))
+         (out '()))
+    (dolist (o outcomes)
+      (when (equal (plist-get o :status) "missed")
+        (let ((weekday (writing-habit-checks--weekday (plist-get o :day)))
+              (streak 1))
+          (catch 'stop
+            (dolist (week earlier)
+              (unless (seq-find (lambda (e) (and (equal (plist-get e :status) "missed")
+                                                 (equal (plist-get e :start) (plist-get o :start))
+                                                 (equal (plist-get e :code) (plist-get o :code))
+                                                 (= (writing-habit-checks--weekday (plist-get e :day)) weekday)))
+                                week)
+                (throw 'stop nil))
+              (cl-incf streak)))
+          (push (list :day (plist-get o :day) :start (plist-get o :start) :end (plist-get o :end)
+                      :code (plist-get o :code)
+                      :project (car (writing-habit-name-split-deadline
+                                     (or (cadr (assoc (plist-get o :code) descriptions)) "")))
+                      :category (plist-get o :category) :streak streak
+                      :reason (or (nth 3 (seq-find (lambda (r) (and (equal (nth 0 r) (plist-get o :day))
+                                                                     (equal (nth 1 r) (plist-get o :start))
+                                                                     (equal (nth 2 r) (plist-get o :code))))
+                                                   saved))
+                                  ""))
+                out))))
+    (nreverse out)))
+
+(defun writing-habit-checks--miss-label (m)
+  "Name the missed block M, as Tuesday 05:00-06:30 block of A 1001grantR01."
+  (string-trim-right
+   (format "%s %s-%s block of %s %s"
+           (aref writing-habit-checks-day-names (writing-habit-checks--weekday (plist-get m :day)))
+           (plist-get m :start) (plist-get m :end) (plist-get m :code) (plist-get m :project))))
+
+(defun writing-habit-checks-miss-question (m)
+  "Return the plain question about the missed block M."
+  (let ((streak (plist-get m :streak)))
+    (format "The %s was missed%s. What took that slot?"
+            (writing-habit-checks--miss-label m)
+            (cond ((< streak 2) "")
+                  ((<= streak 5) (format " for the %s week in a row"
+                                         (nth (- streak 2) '("second" "third" "fourth" "fifth"))))
+                  (t (format " for %d weeks in a row" streak))))))
+
+(defun writing-habit-checks-misses-facts (found)
+  "Write the missed blocks FOUND as the facts the model receives."
+  (let ((i 0))
+    (mapconcat (lambda (m)
+                 (setq i (1+ i))
+                 (concat (string-trim-right
+                          (format "Missed block %d: %s %s-%s, %s, %s %s" i
+                                  (aref writing-habit-checks-day-names
+                                        (writing-habit-checks--weekday (plist-get m :day)))
+                                  (plist-get m :start) (plist-get m :end) (plist-get m :category)
+                                  (plist-get m :code) (plist-get m :project)))
+                         (if (>= (plist-get m :streak) 2)
+                             (format ", missed in this slot %d weeks in a row" (plist-get m :streak))
+                           "")))
+               found "\n")))
+
+(defun writing-habit-checks-misses-parse (reply found)
+  "Return one question per block of FOUND from REPLY, or an error message string."
+  (let ((lines (seq-remove #'string-empty-p
+                           (mapcar (lambda (line)
+                                     (string-trim (replace-regexp-in-string
+                                                   "\\`[ \t]*\\(?:[0-9]+[.)]\\|[-*]\\)[ \t]*" "" line)))
+                                   (split-string (or reply "") "\n")))))
+    (cond ((/= (length lines) (length found))
+           (format "the reply held %d questions for %d missed blocks" (length lines) (length found)))
+          ((seq-some (lambda (l) (not (string-suffix-p "?" l))) lines)
+           "a line of the reply was not a question")
+          (t lines))))
+
+(defun writing-habit-checks-misses-questions (found &optional db week-start)
+  "Return a plist :questions :source :facts for the missed blocks FOUND.
+The model, when allowed, may only reword the plain questions."
+  (let* ((facts (writing-habit-checks-misses-facts found))
+         (plain (mapcar #'writing-habit-checks-miss-question found))
+         (questions plain)
+         (source "plain summary written without a model"))
+    (when (and found (writing-habit-coach-allowed-p))
+      (condition-case err
+          (let ((lines (writing-habit-checks-misses-parse (writing-habit-coach-ask "misses" facts) found)))
+            (cond ((stringp lines) (setq source (concat source ", because " lines)))
+                  ((seq-difference (writing-habit-coach-numbers (string-join lines "\n"))
+                                   (writing-habit-coach-numbers facts))
+                   (setq source (concat source ", because a question held a number that is not in the facts")))
+                  (t (setq questions lines
+                           source (format "%s at %s" writing-habit-coach-model writing-habit-coach-url)))))
+        (error (setq source (concat source ", because " (error-message-string err)))))
+      (when db
+        (writing-habit-coach-log db "misses" source facts (string-join questions "\n") week-start)))
+    (list :questions questions :source source :facts facts)))
+
+(defun writing-habit-checks-miss-save (db m question reason)
+  "Keep REASON for the missed block M in DB, asked as QUESTION.
+An empty REASON removes a saved one."
+  (writing-habit-checks--ensure-miss-table db)
+  (let ((reason (string-trim (or reason ""))))
+    (if (string-empty-p reason)
+        (sqlite-execute db "DELETE FROM block_miss WHERE day = ? AND start_time = ? AND code = ?"
+                        (list (plist-get m :day) (plist-get m :start) (plist-get m :code)))
+      (sqlite-execute db "INSERT INTO block_miss(day, start_time, code, question, reason)
+ VALUES (?, ?, ?, ?, ?) ON CONFLICT(day, start_time, code)
+ DO UPDATE SET question = excluded.question, reason = excluded.reason"
+                      (list (plist-get m :day) (plist-get m :start) (plist-get m :code)
+                            question reason)))))
+
+;;;; The Monday message (Rule 8)
+
+(defun writing-habit-checks-plan-gather (week-start minutes legend blocks days &optional objectives)
+  "Collect the plan of WEEK-START for a Monday message, or nil for an empty plan.
+MINUTES is an alist of (CODE . MINUTES), LEGEND of (CODE . DESCRIPTION),
+BLOCKS and DAYS count the blocks and their days, and OBJECTIVES holds
+\(CODE . TEXT) already set for the week, in time order."
+  (let ((total (apply #'+ (mapcar #'cdr minutes))))
+    (when (> total 0)
+      (let* ((projects (writing-habit-checks--sort-by
+                        (lambda (p) (list (- (nth 2 p)) (nth 0 p)))
+                        (mapcar (lambda (pair)
+                                  (let ((split (writing-habit-name-split-deadline
+                                                (or (cdr (assoc (car pair) legend)) (car pair)))))
+                                    (list (car pair)
+                                          (if (string-empty-p (car split)) (car pair) (car split))
+                                          (cdr pair) (cdr split))))
+                                minutes)))
+             (upcoming (seq-filter (lambda (p) (and (nth 3 p) (not (string< (nth 3 p) week-start))))
+                                   projects))
+             (key (if upcoming
+                      (car (writing-habit-checks--sort-by
+                            (lambda (p) (list (nth 3 p) (- (nth 2 p)) (nth 0 p))) upcoming))
+                    (car projects))))
+        (list :week-start week-start :total total :blocks blocks :days days
+              :projects (mapcar (lambda (p) (seq-take p 3)) projects)
+              :key key
+              :objective (cdr (assoc (nth 0 key) objectives)))))))
+
+(defun writing-habit-checks-plan-facts (plan)
+  "Write PLAN as the facts the model receives."
+  (let* ((key (plist-get plan :key))
+         (lines (list (format "Week starting: %s" (plist-get plan :week-start))
+                      (format "Minutes planned: %d (%s)" (plist-get plan :total)
+                              (writing-habit-checks--hours (plist-get plan :total)))
+                      (format "Blocks planned: %d" (plist-get plan :blocks))
+                      (format "Days with writing: %d" (plist-get plan :days)))))
+    (dolist (p (seq-take (plist-get plan :projects) 3))
+      (setq lines (append lines (list (format "Project: %s %s, %d minutes (%s)" (nth 0 p) (nth 1 p)
+                                              (nth 2 p) (writing-habit-checks--hours (nth 2 p)))))))
+    (setq lines (append lines (list (concat (format "Project that matters most: %s %s" (nth 0 key) (nth 1 key))
+                                            (if (nth 3 key)
+                                                (format ", due %s (%s)" (nth 3 key)
+                                                        (writing-habit-checks--date-words (nth 3 key)))
+                                              "")))))
+    (when (plist-get plan :objective)
+      (setq lines (append lines (list (concat "First objective for it: " (plist-get plan :objective))))))
+    (string-join lines "\n")))
+
+(defun writing-habit-checks-plan-plain (plan)
+  "Write the Monday message of PLAN without a model, in the writer's voice."
+  (let* ((blocks (plist-get plan :blocks)) (days (plist-get plan :days))
+         (projects (plist-get plan :projects)) (key (plist-get plan :key))
+         (named (mapcar (lambda (p) (format "%s (%s)" (nth 1 p) (writing-habit-checks--hours (nth 2 p))))
+                        (seq-take projects 3))))
+    (concat (format "This week I plan %s of writing in %d block%s over %d day%s. "
+                    (writing-habit-checks--hours (plist-get plan :total))
+                    blocks (if (= blocks 1) "" "s") days (if (= days 1) "" "s"))
+            (if (= (length projects) 1)
+                (format "All of it goes to %s." (car named))
+              (format "Most of it goes to %s." (writing-habit-checks--series named)))
+            "\n\n"
+            (format "The one that matters most is %s%s" (nth 1 key)
+                    (if (nth 3 key) (format ", due %s." (writing-habit-checks--date-words (nth 3 key)))
+                      ", which has the most time."))
+            (if (plist-get plan :objective)
+                (format " My first objective there is \"%s\"."
+                        (writing-habit-checks--rstrip-dot (plist-get plan :objective)))
+              "")
+            " I will send you how it went on Friday.")))
+
 ;;;; Commands
 
 (defun writing-habit-checks--db-path ()
@@ -1482,6 +1691,66 @@ lists forward, while the completed list still holds the semester's work."
              (format "Semester review of %s" (nth 0 span))
              "Edit it, then copy it into your annual report." (plist-get note :text))
             note))))))
+
+;;;###autoload
+(defun writing-habit-checks-misses ()
+  "Ask one question about each missed block of the open week, and save the answers.
+The coach only asks.  An empty answer removes a saved reason (Rule 6)."
+  (interactive)
+  (let* ((monday (writing-habit-checks-week-monday (writing-habit-table-current)))
+         (allowed (writing-habit-coach-allowed-p)))
+    (writing-habit-checks--with-db db
+      (let ((found (writing-habit-checks-misses-find db monday (writing-habit-checks--today))))
+        (if (null found)
+            (message "No block of this week has been missed so far, so there is nothing to ask about.")
+          (let* ((asked (writing-habit-checks-misses-questions found (and allowed db) monday))
+                 (saved 0))
+            (cl-loop for m in found
+                     for question in (plist-get asked :questions)
+                     do (let ((reason (read-string (concat question " ") (plist-get m :reason))))
+                          (writing-habit-checks-miss-save db m question reason)
+                          (unless (string-empty-p (string-trim reason)) (cl-incf saved))))
+            (message "Saved %d reason%s for missed blocks" saved (if (= saved 1) "" "s"))
+            asked))))))
+
+;;;###autoload
+(defun writing-habit-checks-plan-message ()
+  "Draft the Monday message that tells a partner the open week's plan (Rule 8).
+Nothing is sent.  Edit the draft and copy it with \\`C-c C-c'."
+  (interactive)
+  (let* ((table (writing-habit-table-current))
+         (monday (writing-habit-checks-week-monday table))
+         (slots (writing-habit-checks-slots table))
+         (minutes '())
+         (path (or (and (boundp 'writing-habit-dispatch--last-db) writing-habit-dispatch--last-db)
+                   (and (boundp 'writing-habit-default-db) writing-habit-default-db)))
+         (db (and path (writing-habit-db-connect path))))
+    (dolist (s slots)
+      (let ((cell (assoc (writing-habit-checks-slot-code s) minutes)))
+        (if cell (setcdr cell (+ (cdr cell) (writing-habit-checks-slot-minutes s)))
+          (setq minutes (append minutes (list (cons (writing-habit-checks-slot-code s)
+                                                    (writing-habit-checks-slot-minutes s))))))))
+    (unwind-protect
+        (let* ((objectives
+                (when (and db (member "block_objective" (writing-habit-checks--tables db)))
+                  (mapcar (lambda (r) (cons (nth 0 r) (nth 1 r)))
+                          (sqlite-select db "SELECT code, text FROM block_objective WHERE week_start = ?
+ AND done = 0 ORDER BY day, start_time, position, objective_id" (list monday)))))
+               (plan (writing-habit-checks-plan-gather
+                      monday minutes (writing-habit-checks--legend table) (length slots)
+                      (length (seq-uniq (mapcar #'writing-habit-checks-slot-offset slots)))
+                      objectives)))
+          (if (null plan)
+              (message "The week has no blocks yet, so there is no plan to tell")
+            (let ((note (writing-habit-coach-note
+                         "plan_message" (writing-habit-checks-plan-facts plan)
+                         (writing-habit-checks-plan-plain plan)
+                         (and (writing-habit-coach-allowed-p) db) monday)))
+              (writing-habit-coach-show-draft "Monday message for your writing partner"
+                                              "Edit it, then copy it into a message."
+                                              (plist-get note :text))
+              note)))
+      (when db (writing-habit-db-close db)))))
 
 (provide 'writing-habit-checks)
 ;;; writing-habit-checks.el ends here

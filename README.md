@@ -43,7 +43,7 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 - A schedule-code decoder that reads a compact file name such as `4gAAeAsA-gWW.org` and checks its project letters against a table legend.
 - A cross-week history of adherence, as a text table identical to the Python output, as an org table, and as a five-panel plot.
 - A minor mode for editing the weekly table, with clash and free-time tints, code completion, and commands that insert and move blocks and projects while keeping the file intact.
-- The coach's planning checks and helpers from the Python port, with the same rules and the same plain notes. They check deadline coverage, match blocks to an energy profile, rescue missed blocks or let them go, capture a stray thought to the grasscatcher, suggest a number for a new project, triage the projects carried into a new semester, find stuck projects, and draft the Friday summary for a partner and a semester review for an annual report. The software computes every proposal. A local model, when `writing-habit-coach-use-model` allows it, only words the note, and a note that holds a number the facts do not is replaced by the plain one.
+- The coach's planning checks and helpers from the Python port, with the same rules and the same plain notes. They check deadline coverage, match blocks to an energy profile, rescue missed blocks or let them go, capture a stray thought to the grasscatcher, suggest a number for a new project, triage the projects carried into a new semester, find stuck projects, ask why each missed block was missed, and draft the Monday and Friday messages for a partner and a semester review for an annual report. The software computes every proposal. A local model, when `writing-habit-coach-use-model` allows it, only words the note, and a note that holds a number the facts do not is replaced by the plain one.
 - Every stage is an interactive command, gathered under one menu that also runs the `writing-schedule.el` commands, and every stage is also a batch subcommand, so the toolkit runs from a shell or a Makefile the same way the Python command-line interface does.
 
 ## Requirements
@@ -144,6 +144,8 @@ An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `wri
 | `writing-habit-helpers-number-project` | Suggest a free number beside related projects |
 | `writing-habit-helpers-triage-carried` | Suggest keeping, deferring, or dropping each carried project |
 | `writing-habit-helpers-find-stuck` | Name the projects whose objectives keep going unmet |
+| `writing-habit-checks-misses` | Ask one question about each missed block and save the answers |
+| `writing-habit-checks-plan-message` | Draft the Monday message that tells a partner the week's plan |
 | `writing-habit-checks-partner` | Draft the weekly summary for an accountability partner |
 | `writing-habit-checks-semester` | Draft a semester narrative for an annual faculty report |
 

@@ -369,5 +369,81 @@
                        '("05:00" "07:15" "14:00")))
         (should (equal (writing-habit-table-cell table row 4) "gA"))))))
 
+;;;; Why a block was missed, and the Monday message
+
+(defun writing-habit-checks-tests--miss-db ()
+  "Return a database with the missed blocks of test_misses.py."
+  (let ((db (writing-habit-db-connect nil)))
+    (writing-habit-db-init db)
+    (let ((ids (sqlite-select db "SELECT name, category_id FROM category"))
+          (a (writing-habit-db-get-or-create-project db "A" "1001grantR01 2026-10-30" "safe"))
+          (e (writing-habit-db-get-or-create-project db "E" "email" nil)))
+      (dolist (spec (list (list "2026-10-06" a "generative" "05:00") (list "2026-10-13" a "generative" "05:00")
+                          (list "2026-10-12" e "support" "13:00") (list "2026-10-14" a "generative" "07:00")))
+        (sqlite-execute db "INSERT INTO plan_block(day, start_time, end_time, project_id, category_id)
+ VALUES (?, ?, strftime('%H:%M', ?, '+90 minutes'), ?, ?)"
+                        (list (nth 0 spec) (nth 3 spec) (nth 3 spec) (nth 1 spec)
+                              (cadr (assoc (nth 2 spec) ids)))))
+      (sqlite-execute db "INSERT INTO session(day, start_time, end_time, actual_min, project_id, source)
+ VALUES ('2026-10-14', '07:00', '08:30', 90, ?, 'manual')" (list a)))
+    db))
+
+(writing-habit-checks-tests--deftest writing-habit-checks/misses
+  (let ((db (writing-habit-checks-tests--miss-db)))
+    (unwind-protect
+        (let ((found (writing-habit-checks-misses-find db "2026-10-12" "2026-10-16")))
+          (should (equal (mapcar (lambda (m) (list (plist-get m :day) (plist-get m :code) (plist-get m :streak)))
+                                 found)
+                         '(("2026-10-12" "E" 1) ("2026-10-13" "A" 2))))
+          (should (equal (writing-habit-checks-miss-question (nth 1 found))
+                         "The Tuesday 05:00-06:30 block of A 1001grantR01 was missed for the second week in a row. What took that slot?"))
+          (should (equal (writing-habit-checks-miss-question (nth 0 found))
+                         "The Monday 13:00-14:30 block of E email was missed. What took that slot?"))
+          (should (equal (nth 1 (split-string (writing-habit-checks-misses-facts found) "\n"))
+                         "Missed block 2: Tuesday 05:00-06:30, generative, A 1001grantR01, missed in this slot 2 weeks in a row"))
+          (writing-habit-checks-miss-save db (nth 1 found) "q" "Committee meeting moved")
+          (writing-habit-checks-miss-save db (nth 1 found) "q" "  The committee met at 5  ")
+          (should (equal (plist-get (nth 1 (writing-habit-checks-misses-find db "2026-10-12" "2026-10-16")) :reason)
+                         "The committee met at 5"))
+          (writing-habit-checks-miss-save db (nth 1 found) "q" "")
+          (should (= (caar (sqlite-select db "SELECT COUNT(*) FROM block_miss")) 0))
+          (should (equal (writing-habit-checks-misses-parse "1. What took Monday?\n- What took Tuesday?" found)
+                         '("What took Monday?" "What took Tuesday?")))
+          (should (stringp (writing-habit-checks-misses-parse "What happened?" found)))
+          (let ((writing-habit-coach-use-model nil))
+            (should (equal (plist-get (writing-habit-checks-misses-questions found) :questions)
+                           (mapcar #'writing-habit-checks-miss-question found))))
+          (let ((writing-habit-coach-use-model t) (writing-habit-coach-ai-off nil))
+            (cl-letf (((symbol-function 'writing-habit-coach-ask)
+                       (lambda (&rest _) "What took it on day 9?\nWhat took Tuesday?")))
+              (should (string-search "number" (plist-get (writing-habit-checks-misses-questions found) :source))))))
+      (writing-habit-db-close db))))
+
+(writing-habit-checks-tests--deftest writing-habit-checks/plan-message
+  (let* ((legend '(("A" . "1006AIrxOpt 2026-10-30") ("B" . "1002RNAediting 2027-03-01")
+                   ("C" . "2003reviewArticle") ("E" . "email")))
+         (minutes '(("A" . 90) ("B" . 180) ("C" . 270) ("E" . 135)))
+         (plan (writing-habit-checks-plan-gather "2026-10-12" minutes legend 8 5
+                                                 '(("C" . "Outline the review") ("A" . "Draft aim 1.")))))
+    (should (equal (nth 0 (plist-get plan :key)) "A"))
+    (should (equal (writing-habit-checks-plan-plain plan)
+                   (concat "This week I plan 11 h 15 min of writing in 8 blocks over 5 days. "
+                           "Most of it goes to 2003reviewArticle (4 h 30 min), 1002RNAediting "
+                           "(3 h 00 min), and email (2 h 15 min).\n\n"
+                           "The one that matters most is 1006AIrxOpt, due October 30. My first "
+                           "objective there is \"Draft aim 1\". I will send you how it went on Friday.")))
+    (should (string-search "Project that matters most: A 1006AIrxOpt, due 2026-10-30 (October 30)"
+                           (writing-habit-checks-plan-facts plan)))
+    (should (string-prefix-p
+             "This week I plan 2 h 00 min of writing in 1 block over 1 day. All of it goes to 2003reviewArticle (2 h 00 min).\n\nThe one that matters most is 2003reviewArticle, which has the most time."
+             (writing-habit-checks-plan-plain
+              (writing-habit-checks-plan-gather "2026-10-12" '(("C" . 120)) '(("C" . "2003reviewArticle")) 1 1))))
+    (should-not (writing-habit-checks-plan-gather "2026-10-12" nil nil 0 0))
+    (should (equal (nth 0 (plist-get (writing-habit-checks-plan-gather
+                                      "2026-10-12" '(("A" . 60) ("C" . 90))
+                                      '(("A" . "old 2026-09-01") ("C" . "2003review")) 2 2)
+                                     :key))
+                   "C"))))
+
 (provide 'writing-habit-checks-tests)
 ;;; writing-habit-checks-tests.el ends here
