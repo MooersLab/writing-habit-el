@@ -8,6 +8,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'cl-lib)
 (require 'json)
 (require 'writing-habit-coach)
 
@@ -73,6 +74,36 @@
     (should (equal (writing-habit-coach-objectives-checklist reply)
                    (concat "- [ ] Draft aim 2\n- [ ] Find 3 citations\n- [ ] c\n"
                            "If email calls, then I will park it.")))))
+
+(ert-deftest writing-habit-coach/note-keeps-only-checked-replies ()
+  (let ((writing-habit-coach-use-model t)
+        (writing-habit-coach-ai-off nil)
+        (facts "Share of the plan kept: 47%\nMinutes written: 420"))
+    (cl-letf (((symbol-function 'writing-habit-coach-ask)
+               (lambda (_task _facts) "I wrote 420 minutes,   47% of the plan.\n\nGood.")))
+      (should (equal (plist-get (writing-habit-coach-note "semester" facts "plain") :text)
+                     "I wrote 420 minutes, 47% of the plan.\n\nGood.")))
+    (cl-letf (((symbol-function 'writing-habit-coach-ask)
+               (lambda (_task _facts) "I published 4 papers.")))
+      (let ((note (writing-habit-coach-note "semester" facts "plain")))
+        (should (equal (plist-get note :text) "plain"))
+        (should (string-search "not in the facts" (plist-get note :source)))))
+    (cl-letf (((symbol-function 'writing-habit-coach-ask)
+               (lambda (_task _facts) "A fine semester.")))
+      (should (equal (plist-get (writing-habit-coach-note
+                                 "semester" facts "plain" nil nil
+                                 (lambda (text) (unless (string-search "47%" text) "no share")))
+                                :text)
+                     "plain")))
+    (let ((writing-habit-coach-ai-off t))
+      (cl-letf (((symbol-function 'writing-habit-coach-ask) (lambda (&rest _) (error "Asked"))))
+        (should (equal (plist-get (writing-habit-coach-note "semester" facts "plain") :source)
+                       "plain summary written without a model"))))))
+
+(ert-deftest writing-habit-coach/prompts-cover-the-new-tasks ()
+  (let ((tasks (gethash "tasks" (writing-habit-coach-prompts))))
+    (dolist (name '("coverage" "energy" "capture" "rescue" "numbering" "triage" "partner" "semester"))
+      (should (gethash name tasks)))))
 
 (provide 'writing-habit-coach-tests)
 ;;; writing-habit-coach-tests.el ends here

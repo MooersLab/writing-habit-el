@@ -38,6 +38,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'json)
 (require 'seq)
 (require 'subr-x)
@@ -205,6 +206,135 @@ Interruptions counted, as the Python port sends them."
       (erase-buffer)
       (insert text "\n")
       (display-buffer (current-buffer)))))
+
+;;;; Notes around facts the software computed
+
+(defcustom writing-habit-coach-use-model nil
+  "Non-nil lets the planning checks and helpers ask the local model.
+Every check computes its proposals itself and has a plain note, so with
+this nil, the default, nothing is sent anywhere."
+  :type 'boolean)
+
+(defcustom writing-habit-coach-ai-off nil
+  "Non-nil marks an AI-off week, in which the coach does not answer.
+The checks still run and give their plain notes, and nothing is logged,
+so the week counts as a week without the coach."
+  :type 'boolean)
+
+(defvar writing-habit-coach-chooser #'writing-habit-coach--ask-each
+  "Function that asks which proposals to apply.
+It is called with a title, a note, and a list of proposal lines, and
+returns the indexes of the lines accepted.  Tests replace it.")
+
+(defun writing-habit-coach-numbers (text)
+  "Return the whole numbers written in TEXT, without repeats."
+  (let ((out '()) (start 0))
+    (while (string-match "[0-9]+" (or text "") start)
+      (cl-pushnew (string-to-number (match-string 0 text)) out)
+      (setq start (match-end 0)))
+    out))
+
+(defun writing-habit-coach-clean (text)
+  "Collapse the white space of TEXT inside each paragraph, keeping the breaks."
+  (string-join
+   (seq-remove #'string-empty-p
+               (mapcar (lambda (part)
+                         (string-trim (replace-regexp-in-string "[ \t\n]+" " " part)))
+                       (split-string (string-trim (or text "")) "\n[ \t]*\n")))
+   "\n\n"))
+
+(defun writing-habit-coach-allowed-p ()
+  "Return non-nil when the coach may ask the model now."
+  (and writing-habit-coach-use-model (not writing-habit-coach-ai-off)))
+
+(defun writing-habit-coach-log (db task source facts reply &optional week-start)
+  "Write one coach call to the ai_log table of DB and return its id."
+  (sqlite-execute db "INSERT INTO ai_log(task, source, facts, reply, week_start)
+ VALUES (?, ?, ?, ?, ?)" (list task source facts reply week-start))
+  (caar (sqlite-select db "SELECT last_insert_rowid()")))
+
+(defun writing-habit-coach-mark-accepted (db log-id accepted)
+  "Mark the call LOG-ID of DB as ACCEPTED or discarded."
+  (when (and db log-id)
+    (sqlite-execute db "UPDATE ai_log SET accepted = ? WHERE log_id = ?"
+                    (list (if accepted 1 0) log-id))))
+
+(defun writing-habit-coach-note (task facts plain &optional db week-start check)
+  "Word the FACTS of TASK, or fall back to the PLAIN note.
+Return a plist with :text, :source, :facts, and :log-id.  The model is
+asked only when `writing-habit-coach-allowed-p'.  Its reply is used only
+when it holds no number that FACTS do not hold and CHECK, a function of
+the cleaned reply that returns an error message or nil, passes.  When the
+model was allowed and DB is given, the call is logged under WEEK-START."
+  (let ((source "plain summary written without a model")
+        (text nil))
+    (when (writing-habit-coach-allowed-p)
+      (condition-case err
+          (let* ((reply (writing-habit-coach-clean
+                         (writing-habit-coach-ask task facts)))
+                 (problem
+                  (cond ((string-empty-p reply) "the local model sent an empty note")
+                        ((seq-difference (writing-habit-coach-numbers reply)
+                                         (writing-habit-coach-numbers facts))
+                         "the note held a number that is not in the facts")
+                        (check (funcall check reply)))))
+            (if problem
+                (setq source (concat source ", because " problem))
+              (setq text reply
+                    source (format "%s at %s" writing-habit-coach-model
+                                   writing-habit-coach-url))))
+        (error (setq source (concat source ", because "
+                                    (error-message-string err))))))
+    (let ((text (or text plain)))
+      (list :text text :source source :facts facts
+            :log-id (when (and db (writing-habit-coach-allowed-p))
+                      (writing-habit-coach-log db task source facts text week-start))))))
+
+(defun writing-habit-coach--ask-each (title note items)
+  "Show NOTE under TITLE with ITEMS, then ask about each item in turn.
+Return the indexes of the items accepted."
+  (with-current-buffer (get-buffer-create "*writing-habit coach*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert title "\n\n" note "\n")
+      (when items
+        (insert "\nProposals:\n")
+        (dolist (item items) (insert "  - " item "\n"))))
+    (goto-char (point-min))
+    (special-mode)
+    (display-buffer (current-buffer)))
+  (let ((out '()) (index 0))
+    (dolist (item items)
+      (when (y-or-n-p (format "%s? " item)) (push index out))
+      (setq index (1+ index)))
+    (nreverse out)))
+
+(defvar writing-habit-coach-draft-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") #'writing-habit-coach-copy-draft)
+    map)
+  "Keymap of a draft buffer: \\`C-c C-c' copies the draft.")
+
+(defun writing-habit-coach-show-draft (title intro text)
+  "Show TEXT, a draft the writer edits and copies, with TITLE and INTRO.
+Return the draft buffer.  Nothing is sent from it."
+  (let ((buffer (get-buffer-create (format "*%s*" title))))
+    (with-current-buffer buffer
+      (erase-buffer)
+      (text-mode)
+      (insert text "\n")
+      (goto-char (point-min))
+      (use-local-map (make-composed-keymap writing-habit-coach-draft-map
+                                           (current-local-map)))
+      (setq header-line-format (concat intro "  C-c C-c copies it.")))
+    (display-buffer buffer)
+    buffer))
+
+(defun writing-habit-coach-copy-draft ()
+  "Copy the draft in the current buffer to the kill ring and clipboard."
+  (interactive)
+  (kill-new (string-trim (buffer-substring-no-properties (point-min) (point-max))))
+  (message "Copied the draft"))
 
 (provide 'writing-habit-coach)
 ;;; writing-habit-coach.el ends here

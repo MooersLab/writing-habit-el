@@ -43,6 +43,7 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 - A schedule-code decoder that reads a compact file name such as `4gAAeAsA-gWW.org` and checks its project letters against a table legend.
 - A cross-week history of adherence, as a text table identical to the Python output, as an org table, and as a five-panel plot.
 - A minor mode for editing the weekly table, with clash and free-time tints, code completion, and commands that insert and move blocks and projects while keeping the file intact.
+- The coach's planning checks and helpers from the Python port, with the same rules and the same plain notes. They check deadline coverage, match blocks to an energy profile, rescue missed blocks or let them go, capture a stray thought to the grasscatcher, suggest a number for a new project, triage the projects carried into a new semester, find stuck projects, and draft the Friday summary for a partner and a semester review for an annual report. The software computes every proposal. A local model, when `writing-habit-coach-use-model` allows it, only words the note, and a note that holds a number the facts do not is replaced by the plain one.
 - Every stage is an interactive command, gathered under one menu that also runs the `writing-schedule.el` commands, and every stage is also a batch subcommand, so the toolkit runs from a shell or a Makefile the same way the Python command-line interface does.
 
 ## Requirements
@@ -112,7 +113,7 @@ writing-habit   database: ~/habit.db
 
 ## Editing the weekly table
 
-An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. A lowercase letter before a code, as in `eA`, sets the activity of that block, and a legend tag such as `E: email @support` sets a project's default; each filled cell is tinted by its activity. Clash cells turn red, and with point in the Time column of a block, every block whose range does not overlap it turns yellow. Completion in a day cell offers the legend codes, and the echo area names the project, due date, and risk of the code at point. `M-<up>` and `M-<down>` move a block or a legend entry, and `C-c C-;` opens a menu that inserts blocks with a suggested time range, deletes a block or a legend entry, moves the section activities into the cells, inserts projects with the next free code (a single letter, then a digit `0` to `9`, then `AA`, `AB`, and so on, so the legend can hold 712 projects) and asks for each project's name and `YYYY-MM-DD` deadline, sorts the legend by project number, splits old descriptions into a project and a deadline, copies a project from the semester lists that follow the weekly table into this week's legend, marks a current-semester project completed, renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
+An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. A lowercase letter before a code, as in `eA`, sets the activity of that block, and a legend tag such as `E: email @support` sets a project's default; each filled cell is tinted by its activity. Clash cells turn red, and with point in the Time column of a block, every block whose range does not overlap it turns yellow. Completion in a day cell offers the legend codes, and the echo area names the project, due date, and risk of the code at point. `M-<up>` and `M-<down>` move a block or a legend entry, and `C-c C-;` opens a menu that inserts blocks with a suggested time range, deletes a block or a legend entry, moves the section activities into the cells, inserts projects with the next free code (a single letter, then a digit `0` to `9`, then `AA`, `AB`, and so on, so the legend can hold 712 projects) and asks for each project's name and `YYYY-MM-DD` deadline, sorts the legend by project number, splits old descriptions into a project and a deadline, copies a project from the semester lists that follow the weekly table into this week's legend, marks a current-semester project completed, renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. Its Coach column runs the planning checks and helpers on the open week. Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
 
 ## Command reference
 
@@ -134,6 +135,17 @@ An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `wri
 | `writing-habit-name` | Decode a schedule code and check it against a legend |
 | `writing-habit-table-mode` | Edit a weekly table with live checks |
 | `writing-habit-dispatch-preview` | Show a written file the way its kind deserves |
+| `writing-habit-checks-coverage` | Offer a block to each project due soon with no block left this week |
+| `writing-habit-checks-energy` | Offer swaps for blocks whose hours do not suit their kind of writing |
+| `writing-habit-checks-energy-show` | Show the energy profile as a grid |
+| `writing-habit-checks-energy-from-reviews` | Set the energy profile from focus ratings |
+| `writing-habit-checks-rescue` | Offer make-up slots for missed blocks, or say to let them go |
+| `writing-habit-helpers-capture` | File a thought in plain words on the grasscatcher |
+| `writing-habit-helpers-number-project` | Suggest a free number beside related projects |
+| `writing-habit-helpers-triage-carried` | Suggest keeping, deferring, or dropping each carried project |
+| `writing-habit-helpers-find-stuck` | Name the projects whose objectives keep going unmet |
+| `writing-habit-checks-partner` | Draft the weekly summary for an accountability partner |
+| `writing-habit-checks-semester` | Draft a semester narrative for an annual faculty report |
 
 ## Batch use from a shell
 
@@ -220,6 +232,12 @@ Because Emacs runs only the first statement of a multi-statement string through 
 | `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes |
 | `writing-habit-table-mode-auto` | t | Turn on the table mode in schedule-code files |
 | `writing-habit-table-mode-prefix` | `"C-c C-;"` | Key of the table menu |
+| `writing-habit-coach-use-model` | nil | Let the checks ask the local model to word their notes |
+| `writing-habit-coach-ai-off` | nil | Mark an AI-off week, in which the coach stays quiet |
+| `writing-habit-checks-energy-file` | `writing-habit-energy.json` in `user-emacs-directory` | The energy profile, in the Python port's JSON form |
+| `writing-habit-checks-coverage-days` | 28 | Days ahead in which a deadline counts as soon |
+| `writing-habit-checks-semester` | nil | The semester to review, as name, start, and end |
+| `writing-habit-helpers-projects-root` | `"~"` | Folder of the numbered project folders |
 
 Set them through `M-x customize-group RET writing-habit RET` or in your init file.
 

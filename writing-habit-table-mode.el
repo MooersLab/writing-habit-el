@@ -853,6 +853,17 @@ the wrong plan shape."
 
 ;;;; Menu and keymap
 
+;; The coach's planning checks and helpers live in their own libraries,
+;; which load when a command of the menu first runs.
+(dolist (command '(writing-habit-checks-coverage writing-habit-checks-energy
+                   writing-habit-checks-energy-show writing-habit-checks-energy-from-reviews
+                   writing-habit-checks-rescue writing-habit-checks-partner
+                   writing-habit-checks-semester))
+  (autoload command "writing-habit-checks" nil t))
+(dolist (command '(writing-habit-helpers-capture writing-habit-helpers-number-project
+                   writing-habit-helpers-triage-carried writing-habit-helpers-find-stuck))
+  (autoload command "writing-habit-helpers" nil t))
+
 ;;;###autoload (autoload 'writing-habit-table-menu "writing-habit-table-mode" nil t)
 (transient-define-prefix writing-habit-table-menu ()
   "Commands for editing the weekly block table."
@@ -875,6 +886,17 @@ the wrong plan shape."
     ("l" "Copy to this week's legend" writing-habit-table-copy-to-legend)
     ("C" "Mark completed" writing-habit-table-mark-completed)
     ("S" "Sort list by number" writing-habit-table-sort-by-number)]
+   ["Coach"
+    ("v" "Check deadline coverage" writing-habit-checks-coverage)
+    ("e" "Match blocks to my energy" writing-habit-checks-energy)
+    ("E" "Show the energy profile" writing-habit-checks-energy-show)
+    ("R" "Rescue missed blocks" writing-habit-checks-rescue)
+    ("k" "Capture to the grasscatcher" writing-habit-helpers-capture)
+    ("#" "Number a new project" writing-habit-helpers-number-project)
+    ("T" "Triage carried projects" writing-habit-helpers-triage-carried)
+    ("u" "Find stuck projects" writing-habit-helpers-find-stuck)
+    ("f" "Summary for my partner" writing-habit-checks-partner)
+    ("y" "Semester review" writing-habit-checks-semester)]
    ["Week"
     ("r" "Report" writing-habit-table-report)
     ("c" "Rename to canonical" writing-habit-table-rename-file)
