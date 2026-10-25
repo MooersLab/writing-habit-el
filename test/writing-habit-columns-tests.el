@@ -103,13 +103,27 @@
                    cell))))
 
 (ert-deftest writing-habit-columns/task-rows ()
-  "A grasscatcher row reads and writes with its priority cookie."
+  "A grasscatcher row reads and writes with its priority cookie and project number."
   (should (equal (writing-habit-columns-task-cell '("1:" "0142" "RET" "[#A1]" "Read it."))
                  "1: [#A1] Read it."))
   (should (equal (writing-habit-columns-task-cell '("-" "" "" "B2" "tidy")) "- [#B2] tidy"))
+  ;; A row the Python editor wrote with the number after the code.
+  (should (equal (writing-habit-columns-task-columns "1: 0142 [#A1] Read it."
+                                                     '(("1" . ("0142" . "RET"))))
+                 '("1:" "0142" "RET" "[#A1]" "Read it.")))
+  ;; A row from before numbers were written still finds its number by code.
   (should (equal (writing-habit-columns-task-columns "1: [#A1] Read it."
                                                      '(("1" . ("0142" . "RET"))))
-                 '("1:" "0142" "RET" "[#A1]" "Read it."))))
+                 '("1:" "0142" "RET" "[#A1]" "Read it.")))
+  ;; The number wins over a code that now names another project.
+  (should (equal (writing-habit-columns-task-columns "A: 0142 Read it."
+                                                     '(("A" . ("1006" . "AIrxOpt"))
+                                                       ("1" . ("0142" . "RET"))))
+                 '("A:" "0142" "RET" "" "Read it.")))
+  ;; A year at the start of a task is not a project number.
+  (should (equal (writing-habit-columns-task-columns "E: 2026 budget"
+                                                     '(("E" . ("" . "email"))))
+                 '("E:" "" "email" "" "2026 budget"))))
 
 (ert-deftest writing-habit-columns/render ()
   "A rendered table is aligned as org aligns it."

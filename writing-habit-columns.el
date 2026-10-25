@@ -134,7 +134,10 @@ A project without a leading four-digit number gives (\"\" . PROJECT)."
           text)))))
 
 (defun writing-habit-columns-task-cell (row)
-  "Return the one-cell form of the grasscatcher ROW, or nil when it is empty."
+  "Return the one-cell form of the grasscatcher ROW, or nil when it is empty.
+The Emacs model keeps the task without its project number, and
+`writing-habit-columns-task-columns' writes the number back from the code,
+or from a number the Python editor wrote after the code."
   (pcase-let ((`(,code ,_number ,_name ,priority ,task)
                (mapcar #'string-trim (writing-habit-columns--pad row 5))))
     (let ((head (writing-habit-columns--head code)))
@@ -171,11 +174,15 @@ PROJECTS is an alist of (CODE . (NUMBER . NAME)) naming each code's project."
     (if (null entry)
         (list "-" "" "" "" (string-trim cell))
       (let* ((text (writing-habit-lists-entry-description entry))
+             (named (and (string-match "\\`\\([0-9]\\{4\\}\\)[ \t]+" text)
+                         (seq-find (lambda (p) (equal (cadr p) (match-string 1 text)))
+                                   projects)))
+             (_ (when named (setq text (substring text (match-end 0)))))
              (priority (and (string-match "\\`\\[#\\([A-Za-z][0-9]*\\|[0-9]+\\)\\][ \t]*" text)
                             (prog1 (match-string 1 text)
                               (setq text (substring text (match-end 0))))))
              (code (writing-habit-lists-entry-code entry))
-             (project (cdr (assoc (or code "") projects))))
+             (project (if named (cdr named) (cdr (assoc (or code "") projects)))))
         (list (if code (concat code ":") "-")
               (or (car project) "") (or (cdr project) "")
               (if priority (format "[#%s]" (upcase priority)) "")
