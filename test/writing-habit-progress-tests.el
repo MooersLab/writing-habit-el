@@ -202,5 +202,224 @@
   (should (equal (writing-habit-progress--fmt 2.5) "2.5"))
   (should (equal (writing-habit-progress--fmt 40) "40")))
 
+;;;; Next week's plan, with the expected text of the Python port
+
+(defun writing-habit-progress-tests--three ()
+  "The three rows of the Python GUI tests."
+  (list (writing-habit-progress-tests--row "0201" "dusp1" :estimate 40 :spent 10 :weight 1)
+        (writing-habit-progress-tests--row "1006" "AIrxOpt" :estimate 100 :spent 3 :weight 3)
+        (writing-habit-progress-tests--row "0655" "VirtIssue25")))
+
+(ert-deftest writing-habit-progress/share-follows-weights-and-time-left ()
+  (let ((rows (list (writing-habit-progress-tests--row "0001" "heavy" :estimate 100 :weight 3)
+                    (writing-habit-progress-tests--row "0002" "light" :estimate 100 :weight 1)
+                    (writing-habit-progress-tests--row "0003" "nearly done" :estimate 10 :spent 9.5 :weight 5)
+                    (writing-habit-progress-tests--row "0004" "no weight" :estimate 10)
+                    (writing-habit-progress-tests--row "0005" "no estimate" :weight 4))))
+    (should (equal (mapcar (lambda (s) (cons (writing-habit-progress-row-number (car s)) (cdr s)))
+                           (writing-habit-progress-share rows 600))
+                   '(("0003" . 30) ("0001" . 420) ("0002" . 150))))))
+
+(ert-deftest writing-habit-progress/plan-matches-the-python-port ()
+  (let ((plan (writing-habit-progress-plan (writing-habit-progress-tests--three) 450
+                                           (writing-habit-checks-default-profile))))
+    (should (equal (writing-habit-progress-plan-facts plan)
+                   "Minutes to plan next week: 450 (7 h 30 min)\nProject 1006 AIrxOpt: weight 3, 97 hours left of 100, planned 330 minutes (5 h 30 min)\nProject 0201 dusp1: weight 1, 30 hours left of 40, planned 120 minutes (2 h 00 min)\nBlock: Monday 05:00-06:30  1006 AIrxOpt, in high hours for new writing\nBlock: Monday 06:30-07:00  0201 dusp1, in high hours for new writing\nBlock: Tuesday 05:00-06:30  1006 AIrxOpt, in high hours for new writing\nBlock: Wednesday 05:00-06:30  1006 AIrxOpt, in high hours for new writing\nBlock: Thursday 05:00-06:00  1006 AIrxOpt, in high hours for new writing\nBlock: Friday 05:00-06:30  0201 dusp1, in high hours for new writing\nLeft out: 0655 VirtIssue25, because it has no estimate"))
+    (should (equal (writing-habit-progress-plan-plain plan)
+                   "Next week's 7 h 30 min go by weight to 1006 AIrxOpt (5 h 30 min) and 0201 dusp1 (2 h 00 min). The heaviest projects take the hours your energy profile rates best for new writing, in blocks of at most 90 minutes with a break after every two hours. 1 project without an estimate or a weight was left out."))
+    (should (equal (mapcar (lambda (r) (writing-habit-progress-item-line plan r))
+                           (writing-habit-progress-plan-eligible plan))
+                   '("1006 AIrxOpt: 5 h 30 min (Monday 05:00-06:30; Tuesday 05:00-06:30; Wednesday 05:00-06:30; Thursday 05:00-06:00)"
+                     "0201 dusp1: 2 h 00 min (Monday 06:30-07:00; Friday 05:00-06:30)")))))
+
+(ert-deftest writing-habit-progress/plan-of-the-practice-week ()
+  (let* ((rows (list (writing-habit-progress-tests--row "1001" "grantR01" :estimate 120 :spent 6.7 :weight 0.9)
+                     (writing-habit-progress-tests--row "2002" "reviewArticle" :estimate 40 :spent 4.3 :weight 0.6)
+                     (writing-habit-progress-tests--row "3003" "methodsNote" :estimate 30 :spent 1.5 :weight 0.3)
+                     (writing-habit-progress-tests--row "4004" "dataPaper" :estimate 60 :spent 2.7 :weight 0.95)
+                     (writing-habit-progress-tests--row "5005" "bookChapter" :estimate 200 :spent 0 :weight 0.4)
+                     (writing-habit-progress-tests--row "9001" "email" :spent 2.8)))
+         (plan (writing-habit-progress-plan rows 1575 (writing-habit-checks-default-profile))))
+    (should (equal (writing-habit-progress-plan-plain plan)
+                   "Next week's 26 h 15 min go by weight to 4004 dataPaper (8 h 00 min), 1001 grantR01 (7 h 30 min), 2002 reviewArticle (5 h 00 min), 5005 bookChapter (3 h 00 min), and 3003 methodsNote (2 h 30 min). The heaviest projects take the hours your energy profile rates best for new writing, in blocks of at most 90 minutes with a break after every two hours. 1 project without an estimate or a weight was left out."))
+    (should (equal (mapcar (lambda (r) (writing-habit-progress-item-line plan r))
+                           (writing-habit-progress-plan-eligible plan))
+                   '("4004 dataPaper: 8 h 00 min (Monday 05:00-06:30; Monday 06:30-07:00; Tuesday 05:00-06:30; Wednesday 05:00-06:30; Thursday 05:00-06:30; Friday 05:00-06:30)"
+                     "1001 grantR01: 7 h 30 min (Monday 07:15-08:45; Tuesday 06:45-08:15; Wednesday 06:45-08:15; Thursday 06:45-08:15; Friday 06:45-08:15)"
+                     "2002 reviewArticle: 5 h 00 min (Tuesday 08:30-10:00; Wednesday 08:30-10:00; Thursday 08:30-10:00; Friday 08:15-08:45)"
+                     "5005 bookChapter: 3 h 00 min (Monday 09:00-10:30; Friday 09:00-10:30)"
+                     "3003 methodsNote: 2 h 30 min (Tuesday 10:15-11:45; Wednesday 10:15-11:15)")))
+    (should (string-search "Project 4004 dataPaper: weight 0.95, 57.3 hours left of 60, planned 480 minutes (8 h 00 min)"
+                           (writing-habit-progress-plan-facts plan)))
+    (should (string-search "Block: Tuesday 10:15-11:45  3003 methodsNote, in medium hours for new writing"
+                           (writing-habit-progress-plan-facts plan)))))
+
+(ert-deftest writing-habit-progress/plain-notes-with-nothing-to-share ()
+  (let ((profile (writing-habit-checks-default-profile)))
+    (should (equal (writing-habit-progress-plan-plain
+                    (writing-habit-progress-plan
+                     (list (writing-habit-progress-tests--row "0001" "a" :estimate 100 :weight 0.9 :planned nil))
+                     300 profile))
+                   "No project is checked for next week, so there is nothing to share out. Check the projects to work on and press Update the plan."))
+    (should (equal (writing-habit-progress-plan-plain
+                    (writing-habit-progress-plan (list (writing-habit-progress-tests--row "0655" "x")) 600 profile))
+                   "No project in the progress table has both a weight and time left, so there is nothing to share out. Fill in the Est. hours and Weight columns on the Progress tab."))
+    (should (string-prefix-p
+             "All of next week's 3 h 00 min go to 0201 dusp1."
+             (writing-habit-progress-plan-plain
+              (writing-habit-progress-plan (list (writing-habit-progress-tests--row "0201" "dusp1" :estimate 40 :spent 10 :weight 3)
+                                                 (writing-habit-progress-tests--row "0655" "VirtIssue25"))
+                                           180 profile))))))
+
+(ert-deftest writing-habit-progress/unchecked-rows-get-no-time ()
+  (let* ((rows (list (writing-habit-progress-tests--row "0001" "a" :estimate 100 :weight 0.9 :planned nil)
+                     (writing-habit-progress-tests--row "0002" "b" :estimate 100 :weight 0.5)))
+         (plan (writing-habit-progress-plan rows 300 (writing-habit-checks-default-profile))))
+    (should (equal (mapcar (lambda (s) (writing-habit-progress-row-number (car s)))
+                           (writing-habit-progress-plan-shares plan))
+                   '("0002")))
+    (should (equal (mapcar #'writing-habit-progress-row-number (writing-habit-progress-plan-eligible plan))
+                   '("0001" "0002")))
+    (should (equal (writing-habit-progress-item-line plan (car rows)) "0001 a: not in this plan"))))
+
+(ert-deftest writing-habit-progress/add-to-next-week ()
+  (let* ((lines '("#+NAME: next week" "| - 0655VirtIssue25 |" ""
+                  "#+NAME: current-semester-projects" "| A: 1006AIrxOpt 2026-12-15 :safe: |" "| B: 0201dusp1 :safe: |"))
+         (result (writing-habit-progress-add-to-next-week
+                  lines (list (writing-habit-progress-tests--row "1006" "AIrxOpt")
+                              (writing-habit-progress-tests--row "0655" "VirtIssue25")
+                              (writing-habit-progress-tests--row "7777" "newOne")))))
+    (should (= (cdr result) 2))
+    (should (equal (mapcar #'writing-habit-lists-entry-project
+                           (writing-habit-lists-entries (car result) "next week"))
+                   '("0655VirtIssue25" "1006AIrxOpt" "7777newOne")))
+    (should (equal (writing-habit-lists-entry-deadline
+                    (nth 1 (writing-habit-lists-entries (car result) "next week")))
+                   "2026-12-15"))))
+
+(ert-deftest writing-habit-progress/add-to-next-week-makes-the-list ()
+  (let* ((lines '("#+PROJECT_PERIOD: Fall 2026" "#+NAME: current-semester-projects" "| A: 1006AIrxOpt :safe: |"))
+         (result (writing-habit-progress-add-to-next-week
+                  lines (list (writing-habit-progress-tests--row "1006" "AIrxOpt")))))
+    (should (equal (car result)
+                   '("#+NAME: next week" "| - 1006AIrxOpt :safe: |" "" "#+PROJECT_PERIOD: Fall 2026"
+                     "#+NAME: current-semester-projects" "| A: 1006AIrxOpt :safe: |")))))
+
+(defconst writing-habit-progress-tests--week
+  (concat "#+TITLE: progress\n"
+          "|        Time | M  | Tu | W  | Th | F  |\n"
+          "|-------------+----+----+----+----+----|\n"
+          "| 05:00-06:30 | gA | gB | gA | gB | gA |\n"
+          "|-------------+----+----+----+----+----|\n"
+          "| A: 1006AIrxOpt 2026-12-15 :safe: |  |  |  |  |  |\n"
+          "| B: 0201dusp1 :safe: |  |  |  |  |  |\n"
+          "\n"
+          "#+NAME: current-semester-projects\n"
+          "| A: 1006AIrxOpt 2026-12-15 :safe: |\n"
+          "| B: 0201dusp1 :safe: |\n"
+          "| - email |\n"
+          "\n"
+          "#+NAME: next week\n"
+          "| - 0655VirtIssue25 |\n")
+  "The week of the Python GUI tests of the plan.")
+
+(defmacro writing-habit-progress-tests--with-plan (dusp1-planned &rest body)
+  "Run BODY in the test week with its progress table, after making the plan.
+DUSP1-PLANNED sets the Next week box of 0201."
+  (declare (indent 1))
+  `(with-temp-buffer
+     (require 'writing-habit-table-mode)
+     (insert writing-habit-progress-tests--week)
+     (cl-letf (((symbol-function 'writing-habit-table--refresh) #'ignore)
+               ((symbol-function 'pop-to-buffer) #'ignore)
+               ((symbol-function 'writing-habit-checks-profile) #'writing-habit-checks-default-profile))
+       (let ((writing-habit-coach-use-model nil)
+             (week (current-buffer)))
+         (writing-habit-progress--store
+          (list (writing-habit-progress-tests--row "0201" "dusp1" :estimate 40 :spent 10 :weight 0.4
+                                                   :planned ,dusp1-planned)
+                (writing-habit-progress-tests--row "1006" "AIrxOpt" :estimate 100 :spent 3 :weight 0.9)
+                (writing-habit-progress-tests--row "0655" "VirtIssue25")))
+         (let ((plan-buffer (writing-habit-progress-plan-next-week)))
+           (unwind-protect
+               (with-current-buffer plan-buffer ,@body)
+             (kill-buffer plan-buffer)))))))
+
+(ert-deftest writing-habit-progress/plan-buffer-shares-the-week ()
+  (skip-unless (featurep 'writing-schedule))
+  (writing-habit-progress-tests--with-plan t
+    (should (= (writing-habit-progress-plan-capacity writing-habit-progress--plan) 450))
+    (should (equal (mapcar (lambda (s) (cons (writing-habit-progress-row-number (car s)) (cdr s)))
+                           (writing-habit-progress-plan-shares writing-habit-progress--plan))
+                   '(("1006" . 300) ("0201" . 150))))
+    ;; The same lines as the Python port gives for these rows.
+    (should (string-search "[X] 1006 AIrxOpt: 5 h 00 min (Monday 05:00-06:30; Tuesday 05:00-06:30; Wednesday 05:00-06:30; Thursday 05:00-05:30)" (buffer-string)))
+    (should (string-search "[X] 0201 dusp1: 2 h 30 min (Monday 06:45-07:45; Friday 05:00-06:30)" (buffer-string)))
+    (should (string-prefix-p "Next week's 7 h 30 min go by weight" writing-habit-progress--plan-note))
+    ;; Only the checked project of high weight is highlighted.
+    (goto-char (point-min))
+    (search-forward "[X] 1006")
+    (should (eq (get-text-property (point) 'face) 'writing-habit-progress-high))
+    (search-forward "[X] 0201")
+    (should-not (get-text-property (point) 'face))))
+
+(ert-deftest writing-habit-progress/uncheck-update-and-accept ()
+  (skip-unless (featurep 'writing-schedule))
+  (writing-habit-progress-tests--with-plan t
+    (goto-char (point-min))
+    (search-forward "] 0201 dusp1")
+    (writing-habit-progress-plan-toggle)
+    (writing-habit-progress-plan-update)
+    (should (string-search "[X] 1006 AIrxOpt: 7 h 30 min (" (buffer-string)))
+    (should (string-search "[ ] 0201 dusp1: not in this plan" (buffer-string)))
+    (should (string-prefix-p "All of next week's 7 h 30 min go to 1006 AIrxOpt."
+                             writing-habit-progress--plan-note))
+    (let ((week writing-habit-progress--plan-week))
+      (should (= (writing-habit-progress-plan-accept) 1))
+      (with-current-buffer week
+        (should (equal (mapcar #'writing-habit-lists-entry-project
+                               (writing-habit-lists-entries (writing-habit-progress--buffer-lines) "next week"))
+                       '("0655VirtIssue25" "1006AIrxOpt")))
+        (should (equal (mapcar (lambda (r) (cons (writing-habit-progress-row-number r)
+                                                 (writing-habit-progress-row-planned r)))
+                               (writing-habit-progress-rows))
+                       '(("0201") ("1006" . t) ("0655" . t))))
+        (should-not (string-search "dusp1" (current-kill 0)))
+        (should (string-search "AIrxOpt" (current-kill 0)))))))
+
+(ert-deftest writing-habit-progress/accept-after-unchecking-updates-first ()
+  (skip-unless (featurep 'writing-schedule))
+  (writing-habit-progress-tests--with-plan t
+    (goto-char (point-min))
+    (search-forward "] 1006 AIrxOpt")
+    (writing-habit-progress-plan-toggle)
+    (let ((week writing-habit-progress--plan-week))
+      (writing-habit-progress-plan-accept)
+      (with-current-buffer week
+        (should (equal (mapcar #'writing-habit-lists-entry-project
+                               (writing-habit-lists-entries (writing-habit-progress--buffer-lines) "next week"))
+                       '("0655VirtIssue25" "0201dusp1")))))))
+
+(ert-deftest writing-habit-progress/the-choice-carries-over ()
+  (skip-unless (featurep 'writing-schedule))
+  (writing-habit-progress-tests--with-plan nil
+    (should (equal (mapcar #'writing-habit-progress-row-number writing-habit-progress--plan-rows)
+                   '("1006" "0201")))
+    (should (string-search "[X] 1006 AIrxOpt" (buffer-string)))
+    (should (string-search "[ ] 0201 dusp1: not in this plan" (buffer-string)))
+    (should (equal (mapcar (lambda (s) (writing-habit-progress-row-number (car s)))
+                           (writing-habit-progress-plan-shares writing-habit-progress--plan))
+                   '("1006")))))
+
+(ert-deftest writing-habit-progress/discard-keeps-the-old-choices ()
+  (skip-unless (featurep 'writing-schedule))
+  (writing-habit-progress-tests--with-plan t
+    (goto-char (point-min))
+    (search-forward "] 0201 dusp1")
+    (writing-habit-progress-plan-toggle)
+    (writing-habit-progress-plan-update)
+    (with-current-buffer writing-habit-progress--plan-week
+      (should (seq-every-p #'writing-habit-progress-row-planned (writing-habit-progress-rows))))))
+
 (provide 'writing-habit-progress-tests)
 ;;; writing-habit-progress-tests.el ends here

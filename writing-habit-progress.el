@@ -49,7 +49,8 @@
 ;; Commands, run from a buffer that shows a weekly table:
 ;;   `writing-habit-progress'          the progress dashboard
 ;;   `writing-habit-progress-update'   fill Hours spent from mytime.db
-;;   `writing-habit-progress-seed'     add the current list's projects
+;;   `writing-habit-progress-seed-command'  add the current list's projects
+;;   `writing-habit-progress-plan-next-week'  next week's plan from the weights
 
 ;;; Code:
 
@@ -61,8 +62,11 @@
 (require 'writing-habit-name)
 (require 'writing-habit-table)
 (require 'writing-habit-track)
+(require 'writing-habit-checks)
+(require 'writing-habit-hours)
 
 (declare-function writing-habit-table-current "writing-habit-table-mode")
+(declare-function writing-habit-table--apply "writing-habit-table-mode" (model))
 (declare-function writing-habit-table--replace-contents "writing-habit-table-mode" (source))
 
 (defgroup writing-habit-progress nil
@@ -526,7 +530,7 @@ not saved."
                             (or (writing-habit-progress-row-deadline row) "")
                             (if days (number-to-string days) "")
                             (if (writing-habit-progress-row-planned row) "yes" "no"))))))
-      (insert "\n" (propertize "g refresh   u update hours spent   a add the current list's projects   e edit the table   q quit\n"
+      (insert "\n" (propertize "g refresh   u update hours spent   a add the current list's projects   e edit the table   n plan next week   q quit\n"
                                'face 'writing-habit-progress-muted))
       (buffer-string))))
 
@@ -536,6 +540,7 @@ not saved."
     (define-key map (kbd "u") #'writing-habit-progress-update)
     (define-key map (kbd "a") #'writing-habit-progress-seed-command)
     (define-key map (kbd "e") #'writing-habit-progress-edit)
+    (define-key map (kbd "n") #'writing-habit-progress-plan-next-week)
     (define-key map (kbd "q") #'quit-window)
     map)
   "Keymap of `writing-habit-progress-mode'.")
@@ -592,6 +597,485 @@ not saved."
       (setq-local writing-habit-progress--week-buffer week))
     (pop-to-buffer (writing-habit-progress--dashboard-buffer))
     (writing-habit-progress-refresh)))
+
+;;;; Next week's plan from the progress table
+
+;; The twin of progress.share, progress.place, and the Plan next week from
+;; progress item of the Python Coach menu.  The week's hours are shared
+;; among the checked projects by weight, never more than a project has
+;; left, and each project's blocks go in the hours the energy profile
+;; rates best for new writing.  The notes match the Python port word for
+;; word.
+
+(defconst writing-habit-progress-next-week "next week"
+  "The list that accepted projects are added to.")
+
+(cl-defstruct (writing-habit-progress-block
+               (:constructor writing-habit-progress-block-create)
+               (:copier nil))
+  "One block of next week's plan: day OFFSET, START and END, its ROW, and LEVEL."
+  offset start end row level)
+
+(cl-defstruct (writing-habit-progress-plan
+               (:constructor writing-habit-progress-plan-create)
+               (:copier nil))
+  "Next week's plan.
+CAPACITY is the minutes shared, SHARES a list of (ROW . MINUTES), BLOCKS
+the placed blocks, UNPLACED a list of (ROW . MINUTES) that found no slot,
+LEFT-OUT the rows without an estimate or a weight, and ROWS every row."
+  capacity shares blocks unplaced left-out rows)
+
+(defun writing-habit-progress-eligible-p (row)
+  "Return non-nil when ROW can take part in a plan: a weight and time left."
+  (let ((w (writing-habit-progress-row-weight row))
+        (left (writing-habit-progress-remaining row)))
+    (and w (> w 0) left (> left 0))))
+
+(defun writing-habit-progress--by-weight (rows)
+  "Return ROWS by weight, highest first, then by number."
+  (sort (copy-sequence rows)
+        (lambda (a b)
+          (let ((wa (writing-habit-progress-row-weight a)) (wb (writing-habit-progress-row-weight b)))
+            (or (> wa wb)
+                (and (= wa wb) (string< (writing-habit-progress-row-number a)
+                                        (writing-habit-progress-row-number b))))))))
+
+(defun writing-habit-progress-plan-eligible (plan)
+  "Return the rows of PLAN that could take part, checked or not, by weight."
+  (writing-habit-progress--by-weight
+   (seq-filter #'writing-habit-progress-eligible-p (writing-habit-progress-plan-rows plan))))
+
+(defun writing-habit-progress-share (rows capacity &optional unit)
+  "Share CAPACITY minutes among ROWS by weight, UNIT minutes at a time.
+UNIT defaults to 30.  Only rows checked for next week, with a weight
+above zero and time remaining, take part.  A row never gets more than it
+has left, and minutes it cannot use go to the others in proportion to
+their weights.  Return (ROW . MINUTES) by weight, highest first."
+  (let* ((unit (or unit 30))
+         (pool (seq-filter (lambda (r) (and (writing-habit-progress-eligible-p r)
+                                            (writing-habit-progress-row-planned r)))
+                           rows))
+         (left (mapcar (lambda (r) (cons r (truncate (* 60 (writing-habit-progress-remaining r)))))
+                       pool))
+         (got (mapcar (lambda (r) (cons r 0)) pool)))
+    (catch 'full
+      (dotimes (_ (/ capacity unit))
+        (let ((open (seq-filter (lambda (r) (>= (- (cdr (assq r left)) (cdr (assq r got))) unit))
+                                pool)))
+          (unless open (throw 'full nil))
+          (let* ((total (apply #'+ (mapcar #'writing-habit-progress-row-weight open)))
+                 (given (+ unit (apply #'+ (mapcar (lambda (r) (cdr (assq r got))) open))))
+                 (pick nil) (best nil))
+            ;; Give the next unit to the open row furthest below its fair
+            ;; share of what the open rows hold.
+            (dolist (r open)
+              (let ((key (list (- (* (/ (float (writing-habit-progress-row-weight r)) total) given)
+                                  (cdr (assq r got)))
+                               (writing-habit-progress-row-weight r)
+                               (- (string-to-number (writing-habit-progress-row-number r))))))
+                (when (or (null best) (writing-habit-progress--key> key best))
+                  (setq best key pick r))))
+            (cl-incf (cdr (assq pick got)) unit)))))
+    (delq nil (mapcar (lambda (r) (let ((m (cdr (assq r got)))) (when (> m 0) (cons r m))))
+                      (writing-habit-progress--by-weight pool)))))
+
+(defun writing-habit-progress--key> (a b)
+  "Return non-nil when the number list A comes after B."
+  (cond ((null a) nil)
+        ((> (car a) (car b)) t)
+        ((< (car a) (car b)) nil)
+        (t (writing-habit-progress--key> (cdr a) (cdr b)))))
+
+(defun writing-habit-progress--key< (a b)
+  "Return non-nil when the number list A comes before B."
+  (writing-habit-progress--key> b a))
+
+(defun writing-habit-progress-place (shares profile &optional days longest first-hour last-hour)
+  "Place each share of SHARES in blocks, by PROFILE.  Return (BLOCKS . UNPLACED).
+DAYS are the day offsets, Monday to Friday by default.  Blocks are at
+most LONGEST minutes, 90 by default, start on the quarter hour from
+FIRST-HOUR, 5, and end by LAST-HOUR, 21.  The heaviest projects go first,
+into the hours PROFILE rates best for generative work.  Blocks never
+overlap, keep every run within two hours, and a day holds at most four."
+  (let* ((days (or days '(0 1 2 3 4)))
+         (longest (or longest 90))
+         (first-hour (or first-hour 5))
+         (last-hour (or last-hour 21))
+         (taken (mapcar (lambda (d) (cons d nil)) days))
+         (blocks '()) (unplaced '()))
+    (dolist (share shares)
+      (let ((minutes (cdr share)) (pieces '()) (missing 0))
+        (while (> minutes 0)
+          (push (min longest minutes) pieces)
+          (setq minutes (- minutes (min longest minutes))))
+        (dolist (piece (nreverse pieces))
+          (let ((best nil))
+            (dolist (day days)
+              (let ((busy (cdr (assq day taken))))
+                (when (< (length busy) 4)
+                  (cl-loop for first from (* first-hour 60) to (- (* last-hour 60) piece) by 15 do
+                           (let ((last (+ first piece)))
+                             (unless (or (seq-some (lambda (iv) (and (< first (cdr iv)) (< (car iv) last))) busy)
+                                         (not (writing-habit-checks--fits-runs (cons (cons first last) busy))))
+                               (let* ((level (writing-habit-checks-fit
+                                              profile "generative"
+                                              (writing-habit-hours--clock first)
+                                              (writing-habit-hours--clock last)))
+                                      (key (list (- level) (length busy) day first)))
+                                 (when (or (null best) (writing-habit-progress--key< key (car best)))
+                                   (setq best (list key day first last level))))))))))
+            (if (null best)
+                (setq missing (+ missing piece))
+              (let ((day (nth 1 best)) (first (nth 2 best)) (last (nth 3 best)))
+                (push (cons first last) (cdr (assq day taken)))
+                (push (writing-habit-progress-block-create
+                       :offset day :start (writing-habit-hours--clock first)
+                       :end (writing-habit-hours--clock last)
+                       :row (car share) :level (nth 4 best))
+                      blocks)))))
+        (when (> missing 0) (push (cons (car share) missing) unplaced))))
+    (cons (sort blocks (lambda (a b)
+                         (or (< (writing-habit-progress-block-offset a) (writing-habit-progress-block-offset b))
+                             (and (= (writing-habit-progress-block-offset a) (writing-habit-progress-block-offset b))
+                                  (string< (writing-habit-progress-block-start a)
+                                           (writing-habit-progress-block-start b))))))
+          (nreverse unplaced))))
+
+(defun writing-habit-progress-plan (rows capacity profile)
+  "Suggest next week's plan from progress ROWS, CAPACITY minutes, and PROFILE."
+  (let* ((shares (writing-habit-progress-share rows capacity))
+         (placed (writing-habit-progress-place shares profile)))
+    (writing-habit-progress-plan-create
+     :capacity capacity :rows rows :shares shares
+     :blocks (car placed) :unplaced (cdr placed)
+     :left-out (seq-filter (lambda (r) (or (null (writing-habit-progress-row-estimate r))
+                                           (not (writing-habit-progress-row-weight r))
+                                           (zerop (writing-habit-progress-row-weight r))))
+                           rows))))
+
+(defun writing-habit-progress-block-line (block)
+  "Return BLOCK as Monday 05:00-06:30  1006 AIrxOpt."
+  (format "%s %s-%s  %s" (aref writing-habit-checks-day-names (writing-habit-progress-block-offset block))
+          (writing-habit-progress-block-start block) (writing-habit-progress-block-end block)
+          (writing-habit-progress-label (writing-habit-progress-block-row block))))
+
+(defun writing-habit-progress--hours (minutes)
+  "Return MINUTES as 7 h 30 min, or 45 min."
+  (let ((h (/ minutes 60)) (m (% minutes 60)))
+    (if (> h 0) (format "%d h %02d min" h m) (format "%d min" m))))
+
+(defun writing-habit-progress--minutes-of (plan row)
+  "Return the minutes PLAN gives ROW."
+  (or (cdr (seq-find (lambda (s) (equal (writing-habit-progress-row-number (car s))
+                                        (writing-habit-progress-row-number row)))
+                     (writing-habit-progress-plan-shares plan)))
+      0))
+
+(defun writing-habit-progress-item-line (plan row)
+  "Name ROW's hours and blocks in PLAN, for a checkbox."
+  (let ((minutes (writing-habit-progress--minutes-of plan row)))
+    (if (zerop minutes)
+        (format "%s: not in this plan" (writing-habit-progress-label row))
+      (let ((when (mapcar (lambda (b)
+                            (format "%s %s-%s"
+                                    (aref writing-habit-checks-day-names (writing-habit-progress-block-offset b))
+                                    (writing-habit-progress-block-start b) (writing-habit-progress-block-end b)))
+                          (seq-filter (lambda (b) (equal (writing-habit-progress-row-number
+                                                          (writing-habit-progress-block-row b))
+                                                         (writing-habit-progress-row-number row)))
+                                      (writing-habit-progress-plan-blocks plan)))))
+        (concat (format "%s: %d h %02d min" (writing-habit-progress-label row) (/ minutes 60) (% minutes 60))
+                (if when (format " (%s)" (string-join when "; ")) ""))))))
+
+(defun writing-habit-progress-plan-facts (plan)
+  "Write PLAN as the facts the model receives."
+  (let ((lines (list (format "Minutes to plan next week: %d (%s)"
+                             (writing-habit-progress-plan-capacity plan)
+                             (writing-habit-progress--hours (writing-habit-progress-plan-capacity plan))))))
+    (dolist (s (writing-habit-progress-plan-shares plan))
+      (let ((row (car s)))
+        (push (format "Project %s: weight %s, %s hours left of %s, planned %d minutes (%s)"
+                      (writing-habit-progress-label row)
+                      (writing-habit-progress--fmt (writing-habit-progress-row-weight row))
+                      (writing-habit-progress--fmt (writing-habit-progress-remaining row))
+                      (writing-habit-progress--fmt (writing-habit-progress-row-estimate row))
+                      (cdr s) (writing-habit-progress--hours (cdr s)))
+              lines)))
+    (dolist (b (writing-habit-progress-plan-blocks plan))
+      (push (format "Block: %s, in %s hours for new writing" (writing-habit-progress-block-line b)
+                    (writing-habit-checks-word (writing-habit-progress-block-level b)))
+            lines))
+    (dolist (u (writing-habit-progress-plan-unplaced plan))
+      (push (format "Not placed: %s, %d minutes, for want of a free slot"
+                    (writing-habit-progress-label (car u)) (cdr u))
+            lines))
+    (dolist (row (writing-habit-progress-plan-left-out plan))
+      (push (format "Left out: %s, because it has no %s" (writing-habit-progress-label row)
+                    (if (writing-habit-progress-row-estimate row) "weight" "estimate"))
+            lines))
+    (string-join (nreverse lines) "\n")))
+
+(defun writing-habit-progress--series (items)
+  "Join ITEMS with commas and a final and."
+  (cond ((null (cdr items)) (car items))
+        ((null (cddr items)) (format "%s and %s" (car items) (cadr items)))
+        (t (concat (string-join (butlast items) ", ") ", and " (car (last items))))))
+
+(defun writing-habit-progress-plan-plain (plan)
+  "Write the note on PLAN without a model, as the Python port does."
+  (let ((shares (writing-habit-progress-plan-shares plan))
+        (left-out (writing-habit-progress-plan-left-out plan)))
+    (cond
+     ((and (null shares) (writing-habit-progress-plan-eligible plan))
+      "No project is checked for next week, so there is nothing to share out. Check the projects to work on and press Update the plan.")
+     ((null shares)
+      "No project in the progress table has both a weight and time left, so there is nothing to share out. Fill in the Est. hours and Weight columns on the Progress tab.")
+     (t
+      (concat
+       (if (null (cdr shares))
+           (format "All of next week's %s go to %s." (writing-habit-progress--hours (cdar shares))
+                   (writing-habit-progress-label (caar shares)))
+         (format "Next week's %s go by weight to %s."
+                 (writing-habit-progress--hours (writing-habit-progress-plan-capacity plan))
+                 (writing-habit-progress--series
+                  (mapcar (lambda (s) (format "%s (%s)" (writing-habit-progress-label (car s))
+                                              (writing-habit-progress--hours (cdr s))))
+                          shares))))
+       " The heaviest projects take the hours your energy profile rates best for new writing, in blocks of at most 90 minutes with a break after every two hours."
+       (if (writing-habit-progress-plan-unplaced plan)
+           (concat " " (mapconcat (lambda (u) (format "%s of %s found no free slot"
+                                                      (writing-habit-progress--hours (cdr u))
+                                                      (writing-habit-progress-label (car u))))
+                                  (writing-habit-progress-plan-unplaced plan) "; ")
+                   ".")
+         "")
+       (if left-out
+           (format " %d project%s without an estimate or a weight %s left out."
+                   (length left-out) (if (= 1 (length left-out)) "" "s")
+                   (if (= 1 (length left-out)) "was" "were"))
+         ""))))))
+
+;;;; Applying an accepted plan to the week buffer
+
+(defun writing-habit-progress-add-to-next-week (lines rows)
+  "Return (LINES . ADDED) with each of ROWS put on the Next week list of LINES.
+LINES are the lines after the weekly table.  A project already on the
+list is skipped.  An entry of the current list is copied without its code,
+so its deadline, risk, and activity come along."
+  (let* ((target writing-habit-progress-next-week)
+         (key (lambda (e) (substring (concat (or (writing-habit-lists-entry-project e) "") "    ") 0 4)))
+         (have (mapcar key (and (writing-habit-lists--span lines target)
+                                (writing-habit-lists-entries lines target))))
+         (current (writing-habit-lists-entries lines writing-habit-lists-current))
+         (added 0))
+    (unless (writing-habit-lists--span lines target)
+      ;; The week lists sit before the period line and the semester lists.
+      (let ((at (or (cl-position-if (lambda (l) (string-match-p "\\`[ \t]*#\\+PROJECT_PERIOD:" l)) lines)
+                    (car (sort (delq nil (mapcar (lambda (n) (writing-habit-lists--name-line lines n))
+                                                 (writing-habit-lists-names)))
+                               #'<))
+                    (length lines))))
+        (setq lines (append (seq-take lines at)
+                            (list (format "#+NAME: %s" target) "")
+                            (nthcdr at lines)))))
+    (dolist (row rows)
+      (let ((number (writing-habit-progress-row-number row)))
+        (unless (member number have)
+          (let* ((from (seq-find (lambda (e) (equal (funcall key e) number)) current))
+                 (entry (if from
+                            (writing-habit-lists-entry-create
+                             :code nil :description (writing-habit-lists-entry-description from)
+                             :risk (writing-habit-lists-entry-risk from)
+                             :activity (writing-habit-lists-entry-activity from))
+                          (writing-habit-lists-entry-create
+                           :code nil :description (concat number (writing-habit-progress-row-name row))))))
+            (setq lines (car (writing-habit-lists-insert lines target nil entry)))
+            (push number have)
+            (cl-incf added)))))
+    (cons lines added)))
+
+(defun writing-habit-progress-capacity (table)
+  "Return the minutes to share next week: the planned minutes of TABLE.
+A week with no blocks gives 600, ten hours."
+  (let ((m (apply #'+ (mapcar #'writing-habit-table-block-minutes (writing-habit-table-blocks table)))))
+    (if (> m 0) m 600)))
+
+(defun writing-habit-progress-apply-plan (week plan checked)
+  "Apply the accepted PLAN to buffer WEEK, with CHECKED the checked rows.
+The Next week column keeps each listed row's box, the planned projects go
+on the Next week list, and the blocks are put on the kill ring.  Return
+the number of projects added to the list."
+  (with-current-buffer week
+    (let* ((numbers (mapcar #'writing-habit-progress-row-number checked))
+           (eligible (writing-habit-progress-plan-eligible plan))
+           (added 0))
+      ;; The projects go on the Next week list first, through the model.
+      (let* ((table (writing-habit-table-current))
+             (result (writing-habit-progress-add-to-next-week
+                      (writing-habit-table-after table)
+                      (mapcar #'car (writing-habit-progress-plan-shares plan)))))
+        (setq added (cdr result))
+        (when (> added 0)
+          (writing-habit-table--set-after table (car result))
+          (writing-habit-table--apply table)))
+      ;; Then the boxes are kept in the Next week column.
+      (let ((rows (writing-habit-progress-rows)))
+        (dolist (row rows)
+          (when (seq-find (lambda (e) (equal (writing-habit-progress-row-number e)
+                                             (writing-habit-progress-row-number row)))
+                          eligible)
+            (setf (writing-habit-progress-row-planned row)
+                  (and (member (writing-habit-progress-row-number row) numbers) t))))
+        (writing-habit-progress--store rows))
+      (kill-new (mapconcat #'writing-habit-progress-block-line
+                           (writing-habit-progress-plan-blocks plan) "\n"))
+      added)))
+
+;;;; The plan buffer
+
+(defvar-local writing-habit-progress--plan nil "The plan shown.")
+(defvar-local writing-habit-progress--plan-rows nil "The rows listed, by weight.")
+(defvar-local writing-habit-progress--plan-checked nil "The numbers of the checked rows.")
+(defvar-local writing-habit-progress--plan-note nil "The note above the rows.")
+(defvar-local writing-habit-progress--plan-source nil "Where the note came from.")
+(defvar-local writing-habit-progress--plan-profile nil "The energy profile used.")
+(defvar-local writing-habit-progress--plan-week nil "The week buffer.")
+
+(defun writing-habit-progress--plan-draw ()
+  "Draw the plan buffer from its state."
+  (let ((inhibit-read-only t) (line (line-number-at-pos)))
+    (erase-buffer)
+    (insert (propertize "Next week from progress\n\n" 'face 'bold)
+            writing-habit-progress--plan-note "\n\n")
+    (dolist (row writing-habit-progress--plan-rows)
+      (let* ((on (member (writing-habit-progress-row-number row) writing-habit-progress--plan-checked))
+             (text (concat (if on "[X] " "[ ] ")
+                           (writing-habit-progress-item-line writing-habit-progress--plan row))))
+        (insert (propertize (if (and on (writing-habit-progress-high-p row))
+                                (propertize text 'face 'writing-habit-progress-high)
+                              text)
+                            'writing-habit-progress-row row)
+                "\n")))
+    (insert "\n" (propertize (format "The note is a %s.\n" writing-habit-progress--plan-source)
+                             'face 'writing-habit-progress-muted)
+            (propertize "SPC toggle   u update the plan   C-c C-c add the checked to Next week   f facts   q discard\n"
+                        'face 'writing-habit-progress-muted))
+    (goto-char (point-min))
+    (forward-line (1- line))))
+
+(defun writing-habit-progress-plan-toggle ()
+  "Check or uncheck the project on this line."
+  (interactive)
+  (let ((row (get-text-property (line-beginning-position) 'writing-habit-progress-row)))
+    (unless row (user-error "No project on this line"))
+    (let ((n (writing-habit-progress-row-number row)))
+      (setq writing-habit-progress--plan-checked
+            (if (member n writing-habit-progress--plan-checked)
+                (delete n writing-habit-progress--plan-checked)
+              (cons n writing-habit-progress--plan-checked))))
+    (writing-habit-progress--plan-draw)
+    (forward-line 1)))
+
+(defun writing-habit-progress--plan-stale-p ()
+  "Return non-nil when the boxes changed after the plan was last made."
+  (not (equal (sort (copy-sequence writing-habit-progress--plan-checked) #'string<)
+              (sort (mapcar (lambda (r) (writing-habit-progress-row-number r))
+                            (seq-filter #'writing-habit-progress-row-planned
+                                        writing-habit-progress--plan-rows))
+                    #'string<))))
+
+(defun writing-habit-progress-plan-update ()
+  "Share the week's hours again among the checked projects only."
+  (interactive)
+  (dolist (row writing-habit-progress--plan-rows)
+    (setf (writing-habit-progress-row-planned row)
+          (and (member (writing-habit-progress-row-number row) writing-habit-progress--plan-checked) t)))
+  (setq writing-habit-progress--plan
+        (writing-habit-progress-plan (writing-habit-progress-plan-rows writing-habit-progress--plan)
+                                     (writing-habit-progress-plan-capacity writing-habit-progress--plan)
+                                     writing-habit-progress--plan-profile)
+        writing-habit-progress--plan-note (writing-habit-progress-plan-plain writing-habit-progress--plan)
+        writing-habit-progress--plan-source "plain summary of the updated plan, written without a model")
+  (writing-habit-progress--plan-draw))
+
+(defun writing-habit-progress-plan-accept ()
+  "Add the checked projects to Next week, keep the boxes, and copy the blocks."
+  (interactive)
+  (when (writing-habit-progress--plan-stale-p)
+    (writing-habit-progress-plan-update))     ; boxes changed after the last update
+  (let* ((plan writing-habit-progress--plan)
+         (checked (seq-filter (lambda (r) (member (writing-habit-progress-row-number r)
+                                                  writing-habit-progress--plan-checked))
+                              writing-habit-progress--plan-rows))
+         (added (writing-habit-progress-apply-plan writing-habit-progress--plan-week plan checked)))
+    (quit-window)
+    (message "Added %d project%s to the Next week list and copied next week's suggested blocks"
+             added (if (= added 1) "" "s"))
+    added))
+
+(defun writing-habit-progress-plan-facts-show ()
+  "Show the facts that were sent, or would be sent, to the model."
+  (interactive)
+  (let ((facts (writing-habit-progress-plan-facts writing-habit-progress--plan)))
+    (with-help-window "*writing-habit plan facts*" (princ facts))))
+
+(defvar writing-habit-progress-plan-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "SPC") #'writing-habit-progress-plan-toggle)
+    (define-key map (kbd "x") #'writing-habit-progress-plan-toggle)
+    (define-key map (kbd "u") #'writing-habit-progress-plan-update)
+    (define-key map (kbd "C-c C-c") #'writing-habit-progress-plan-accept)
+    (define-key map (kbd "f") #'writing-habit-progress-plan-facts-show)
+    (define-key map (kbd "q") #'quit-window)
+    map)
+  "Keymap of `writing-habit-progress-plan-mode'.")
+
+(define-derived-mode writing-habit-progress-plan-mode special-mode "WH-Plan"
+  "Next week's plan from the progress table, one line per project.
+\\{writing-habit-progress-plan-mode-map}"
+  (setq truncate-lines t))
+
+;;;###autoload
+(defun writing-habit-progress-plan-next-week ()
+  "Suggest next week's plan from the progress weights and the energy profile.
+The week's planned minutes are shared among the checked projects by
+weight and placed in the best hours.  In the plan buffer, uncheck a
+project and press \\<writing-habit-progress-plan-mode-map>\\[writing-habit-progress-plan-update] to share the hours again, and
+\\[writing-habit-progress-plan-accept] to add the checked projects to the Next week list."
+  (interactive)
+  (let* ((week (writing-habit-progress--week))
+         (table (with-current-buffer week (writing-habit-table-current)))
+         (rows (with-current-buffer week
+                 (or (writing-habit-progress-read (writing-habit-progress--buffer-lines))
+                     (user-error "The week file has no progress table; make one with writing-habit-progress-seed-command first"))))
+         (rows (if (eq rows 'empty) '() rows))
+         (profile (writing-habit-checks-profile))
+         (plan (writing-habit-progress-plan rows (writing-habit-progress-capacity table) profile))
+         (plain (writing-habit-progress-plan-plain plan)))
+    (if (null (writing-habit-progress-plan-eligible plan))
+        (progn (message "%s" plain) nil)
+      (let ((note (if (writing-habit-progress-plan-shares plan)
+                      (with-current-buffer week
+                        (writing-habit-checks--note "progress_plan" (writing-habit-progress-plan-facts plan)
+                                                    plain (and (writing-habit-coach-allowed-p)
+                                                               (writing-habit-checks-week-monday table))))
+                    (list :text plain :source "plain summary written without a model")))
+            (buffer (get-buffer-create "*writing-habit next week*")))
+        (with-current-buffer buffer
+          (writing-habit-progress-plan-mode)
+          (setq writing-habit-progress--plan plan
+                writing-habit-progress--plan-rows (writing-habit-progress-plan-eligible plan)
+                writing-habit-progress--plan-checked
+                (mapcar #'writing-habit-progress-row-number
+                        (seq-filter #'writing-habit-progress-row-planned
+                                    (writing-habit-progress-plan-eligible plan)))
+                writing-habit-progress--plan-note (plist-get note :text)
+                writing-habit-progress--plan-source (plist-get note :source)
+                writing-habit-progress--plan-profile profile
+                writing-habit-progress--plan-week week)
+          (writing-habit-progress--plan-draw))
+        (pop-to-buffer buffer)
+        buffer))))
 
 (provide 'writing-habit-progress)
 ;;; writing-habit-progress.el ends here

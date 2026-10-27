@@ -865,7 +865,7 @@ the wrong plan shape."
                    writing-habit-helpers-triage-carried writing-habit-helpers-find-stuck))
   (autoload command "writing-habit-helpers" nil t))
 (dolist (command '(writing-habit-progress writing-habit-progress-update
-                   writing-habit-progress-seed-command))
+                   writing-habit-progress-seed-command writing-habit-progress-plan-next-week))
   (autoload command "writing-habit-progress" nil t))
 (autoload 'writing-habit-hours "writing-habit-hours" nil t)
 
@@ -901,6 +901,7 @@ the wrong plan shape."
     ("#" "Number a new project" writing-habit-helpers-number-project)
     ("T" "Triage carried projects" writing-habit-helpers-triage-carried)
     ("u" "Find stuck projects" writing-habit-helpers-find-stuck)
+    ("w" "Plan next week from progress" writing-habit-progress-plan-next-week)
     ("M" "Monday message for my partner" writing-habit-checks-plan-message)
     ("f" "Summary for my partner" writing-habit-checks-partner)
     ("y" "Semester review" writing-habit-checks-semester)]

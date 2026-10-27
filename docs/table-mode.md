@@ -308,6 +308,27 @@ quits. The same commands are `U` and `A` in the table menu. They change the
 buffer and leave saving to you. The columns are found by their header, so a table
 written by the Python Progress tab reads here and the other way round.
 
+`w` in the Coach column, or `n` in the progress dashboard, runs
+`writing-habit-progress-plan-next-week`, the twin of the Python Coach item Plan
+next week from progress, with the same rules and the same notes. The minutes
+to share are the planned minutes of the open week, or ten hours when it plans
+none. They go to the projects checked in the Next week column that have an
+estimate and a weight, in proportion to the weights and 30 minutes at a time,
+never more than a project has left. Each project's minutes are cut into blocks
+of at most 90 minutes and placed on Monday to Friday, heaviest project first, in
+the hours the energy profile rates best for new writing, with no overlaps, at
+most four blocks a day, and the two-hour break rule kept.
+
+The plan opens in a buffer with one line per project, `[X]` for checked. `SPC`
+checks or unchecks the project on the line, `u` shares the hours again among the
+checked projects, `f` shows the facts, `C-c C-c` accepts, and `q` discards. A
+checked project whose weight is above 0.85 is highlighted. Accepting puts the
+planned projects on the Next week list, copying the code-free entry from the
+current list, writes the boxes into the Next week column so they start the same
+way next week, and puts the suggested blocks on the kill ring. When
+`writing-habit-coach-use-model` allows it, a local model words the note, and a
+note with a number the facts do not hold is replaced by the plain note.
+
 ## How edits keep the file intact
 
 Every edit goes through the model in `writing-habit-table.el`, a buffer-free
