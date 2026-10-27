@@ -285,5 +285,26 @@
                              (writing-habit-table-list-entries model writing-habit-lists-current))
                      '("1094RNAstrucDet" "1452PHFSboXt" "2026words"))))))
 
+(ert-deftest writing-habit-columns/week-lists-and-unknown-tables ()
+  (let* ((lines '("#+NAME: next week"
+                  "| Code | Project Number | Project Name | Deadline | Risk tag | Default activity |"
+                  "|------+----------------+--------------+----------+----------+------------------|"
+                  "| A:   | 1094           | RNAstrucDet  |          | :safe:   |                  |"
+                  ""
+                  "#+NAME: my own table"
+                  "| Code | Project Number | Project Name | Deadline | Risk tag | Default activity |"
+                  "|------+----------------+--------------+----------+----------+------------------|"
+                  "| Z:   | 9999           | Untouched    |          |          |                  |"))
+         (read (writing-habit-columns-to-one-cell lines))
+         (one (plist-get read :lines)))
+    (should (member "| A: 1094RNAstrucDet :safe: |" one))
+    ;; A table this package does not keep stays exactly as written.
+    (should (equal (last one 4) (last lines 4)))
+    (let ((out (writing-habit-columns-to-columns one nil nil)))
+      (should (equal (car out) "#+NAME: next week"))
+      (should (member "#+CAPTION: Next week" out))
+      (should (string-prefix-p "| Code " (nth 2 out)))
+      (should (equal (last out 4) (last lines 4))))))
+
 (provide 'writing-habit-columns-tests)
 ;;; writing-habit-columns-tests.el ends here

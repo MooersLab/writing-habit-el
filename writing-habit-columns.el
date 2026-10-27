@@ -64,8 +64,14 @@
   "A line that stands, among the lines after the week, for the This week table.")
 
 (defconst writing-habit-columns-extra-lists
-  '(("carried-over-projects" . "Carried over") ("grasscatcher" . "Grasscatcher"))
-  "Lists the Python editor keeps that are written in columns here too.")
+  '(("carried-over-projects" . "Carried over") ("grasscatcher" . "Grasscatcher")
+    ("next week" . "Next week") ("two weeks out" . "Two weeks out")
+    ("three weeks out" . "Three weeks out") ("four weeks out" . "Four weeks out")
+    ("five weeks out" . "Five weeks out") ("six weeks out" . "Six weeks out")
+    ("seven weeks out" . "Seven weeks out") ("eight weeks out" . "Eight weeks out"))
+  "Lists the Python editor keeps that are written in columns here too.
+The eight week lists hold the projects waiting for each of the next
+eight weeks.")
 
 (defconst writing-habit-columns--risk
   '(("safe" . "safe") ("risky" . "risky") ("speculative" . "risky"))
@@ -283,7 +289,15 @@ any table was in columns."
           (pcase-let* ((`(,start . ,end) (writing-habit-columns--table-end lines index))
                        (block (append (seq-subseq vec start end) nil))
                        (`(,columnar . ,rows) (writing-habit-columns-read-table block)))
-            (if (not columnar)
+            (if (or (not columnar)
+                    ;; A table this package does not keep stays exactly as
+                    ;; written, because it could not be written back in its
+                    ;; own columns.
+                    (not (or (assoc (writing-habit-columns-normalize name)
+                                    (writing-habit-columns--list-names))
+                             (string= (writing-habit-columns-normalize name)
+                                      (writing-habit-columns-normalize
+                                       writing-habit-columns-legend-name)))))
                 (cl-loop for i from index below end
                          do (push (aref vec i) out) (push (+ first-line i) sources))
               (setq found t)
