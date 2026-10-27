@@ -864,6 +864,10 @@ the wrong plan shape."
 (dolist (command '(writing-habit-helpers-capture writing-habit-helpers-number-project
                    writing-habit-helpers-triage-carried writing-habit-helpers-find-stuck))
   (autoload command "writing-habit-helpers" nil t))
+(dolist (command '(writing-habit-progress writing-habit-progress-update
+                   writing-habit-progress-seed-command))
+  (autoload command "writing-habit-progress" nil t))
+(autoload 'writing-habit-hours "writing-habit-hours" nil t)
 
 ;;;###autoload (autoload 'writing-habit-table-menu "writing-habit-table-mode" nil t)
 (transient-define-prefix writing-habit-table-menu ()
@@ -900,6 +904,11 @@ the wrong plan shape."
     ("M" "Monday message for my partner" writing-habit-checks-plan-message)
     ("f" "Summary for my partner" writing-habit-checks-partner)
     ("y" "Semester review" writing-habit-checks-semester)]
+   ["Views"
+    ("h" "Hour view" writing-habit-hours)
+    ("g" "Progress" writing-habit-progress)
+    ("U" "Update hours spent" writing-habit-progress-update)
+    ("A" "Add projects to progress" writing-habit-progress-seed-command)]
    ["Week"
     ("r" "Report" writing-habit-table-report)
     ("c" "Rename to canonical" writing-habit-table-rename-file)

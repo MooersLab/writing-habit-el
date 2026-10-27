@@ -276,6 +276,38 @@ in columns, with its caption kept. writing-schedule 0.6.0 or newer reads
 the `This week` table when it builds the calendar, and a Default activity
 there counts as the `@` tag of the legend.
 
+## The hour view and the progress dashboard
+
+The Views column of the `C-c C-;` menu opens two dashboards of the open week.
+
+`h` runs `writing-habit-hours`, which shows the week as one row per hour and
+one column per day. A block is named in the hour it starts, with its activity
+letter, code, and times, such as `gA 05:00-06:30`, and shows `↓ A` in the
+further hours it fills. Each project keeps one colour, a free hour shows a dot,
+and the last row gives each day's planned minutes. `RET` on a block jumps to its
+cell in the table, and `g` redraws.
+
+`g` runs `writing-habit-progress`, which reads the table named `progress` at
+the end of the week file:
+
+```
+#+NAME: progress
+| Project ID | Project name | Est. hours | Hours spent | Weight | Deadline   | Days to deadline | Next week |
+|------------+--------------+------------+-------------+--------+------------+------------------+-----------|
+| 1006       | AIrxOpt      |        100 |         2.5 |    0.9 | 2026-12-15 |               49 | yes       |
+```
+
+Each project is one bar: `█` for the hours spent, `░` for the hours left of the
+estimate, and `▓` past it. The days to the deadline follow the bar, in amber
+within 14 days and in red once late, and a checked project whose weight is above
+0.85 has its name highlighted. In the dashboard, `u` fills Hours spent from the
+`zTimeSpent` table of `writing-habit-track-mytime-db` and fills an empty deadline
+from the legend or the lists, `a` adds the current list's numbered projects, `e`
+jumps to the table so you can type estimates, weights, and deadlines, and `q`
+quits. The same commands are `U` and `A` in the table menu. They change the
+buffer and leave saving to you. The columns are found by their header, so a table
+written by the Python Progress tab reads here and the other way round.
+
 ## How edits keep the file intact
 
 Every edit goes through the model in `writing-habit-table.el`, a buffer-free
