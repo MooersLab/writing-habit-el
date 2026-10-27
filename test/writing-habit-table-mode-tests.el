@@ -87,7 +87,38 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
   (should (writing-habit-table-schedule-file-p "/x/2026-01-19_4gAeA-gW.org"))
   (should-not (writing-habit-table-schedule-file-p "/x/my-week.org"))
   (should-not (writing-habit-table-schedule-file-p "/x/4gAeA-gW.txt"))
-  (should-not (writing-habit-table-schedule-file-p nil)))
+  (should-not (writing-habit-table-schedule-file-p nil))
+  ;; Weekly tables named for their Monday, as the Python editor names them.
+  (should (writing-habit-table-schedule-file-p "/x/Oct26.org"))
+  (should (writing-habit-table-schedule-file-p "/x/nov-2.org"))
+  (should (writing-habit-table-schedule-file-p "/x/December7.org"))
+  (should-not (writing-habit-table-schedule-file-p "/x/Oct26.txt"))
+  (should-not (writing-habit-table-schedule-file-p "/x/October.org"))
+  (should-not (writing-habit-table-schedule-file-p "/x/notes26.org"))
+  (let ((writing-habit-table-week-name-regexp nil))
+    (should-not (writing-habit-table-schedule-file-p "/x/Oct26.org"))))
+
+(ert-deftest writing-habit-table-mode/turns-on-in-a-week-named-file ()
+  (skip-unless (featurep 'writing-schedule))
+  (let* ((dir (make-temp-file "wh-week" t))
+         (path (expand-file-name "Oct26.org" dir)))
+    (unwind-protect
+        (progn
+          (with-temp-file path
+            (insert "|        Time | M  | Tu |\n"
+                    "|-------------+----+----|\n"
+                    "| 05:00-06:30 | gA | gB |\n"
+                    "|-------------+----+----|\n"
+                    "| A: 1006AIrxOpt :safe: |  |  |\n"))
+          (let ((buffer (find-file-noselect path)))
+            (unwind-protect
+                (with-current-buffer buffer
+                  (require 'org)
+                  (org-mode)
+                  (should writing-habit-table-mode)
+                  (should (eq (key-binding (kbd "C-c C-;")) 'writing-habit-table-menu)))
+              (kill-buffer buffer))))
+      (delete-directory dir t))))
 
 (ert-deftest writing-habit-table-mode/turns-on-by-name ()
   "The mode turns on in a schedule-code file and stays off elsewhere."

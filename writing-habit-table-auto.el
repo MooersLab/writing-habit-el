@@ -47,19 +47,37 @@
   :prefix "writing-habit-table-")
 
 (defcustom writing-habit-table-mode-auto t
-  "When non-nil, turn on `writing-habit-table-mode' in schedule-code files.
-A schedule-code file is an org file whose name decodes as a schedule code
-and that holds a weekly table."
+  "When non-nil, turn on `writing-habit-table-mode' in weekly table files.
+A weekly table file is an org file that holds a weekly table and whose
+name decodes as a schedule code, such as 4gAeA-gW.org, or names a week,
+such as Oct26.org; see `writing-habit-table-week-name-regexp'."
   :type 'boolean
   :group 'writing-habit-table)
 
+(defcustom writing-habit-table-week-name-regexp
+  "\\`\\(?:jan\\|feb\\|mar\\|apr\\|may\\|jun\\|jul\\|aug\\|sep\\|oct\\|nov\\|dec\\)[a-z]*[-_ ]?[0-9]\\{1,2\\}\\'"
+  "A file name, without its directory and extension, that names a week.
+Weekly tables named for the Monday of their week, such as Oct26.org or
+Nov-2.org, match it, as the Python editor names them.  The match ignores
+case.  Set it to nil to turn the mode on in schedule-code files only."
+  :type '(choice regexp (const :tag "Schedule codes only" nil))
+  :group 'writing-habit-table)
+
+(defun writing-habit-table-week-file-p (file)
+  "Return non-nil when the name of FILE names a week, such as Oct26.org."
+  (and file writing-habit-table-week-name-regexp
+       (string-suffix-p ".org" file)
+       (let ((case-fold-search t))
+         (string-match-p writing-habit-table-week-name-regexp (file-name-base file)))))
+
 (defun writing-habit-table-schedule-file-p (file)
-  "Return non-nil when the name of FILE decodes as a schedule code."
+  "Return non-nil when the name of FILE decodes as a schedule code or names a week."
   (and file
        (string-suffix-p ".org" file)
-       (let ((code (writing-habit-plan--schedule-code file)))
-         (condition-case nil (and (writing-habit-name-decode code) t)
-           (error nil)))))
+       (or (writing-habit-table-week-file-p file)
+           (let ((code (writing-habit-plan--schedule-code file)))
+             (condition-case nil (and (writing-habit-name-decode code) t)
+               (error nil))))))
 
 ;;;###autoload
 (defun writing-habit-table-mode-maybe ()
