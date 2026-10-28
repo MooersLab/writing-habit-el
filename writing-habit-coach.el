@@ -97,15 +97,17 @@
     (user-error "%s is not on this computer, so the records stay here"
                 writing-habit-coach-url)))
 
-(defun writing-habit-coach-request (task facts &optional prompts)
+(defun writing-habit-coach-request (task facts &optional prompts schema)
   "Return (ENDPOINT . BODY) for asking TASK about FACTS.
-Use PROMPTS in place of the shared prompts file when it is given."
+Use PROMPTS in place of the shared prompts file when it is given, and
+SCHEMA in place of the task's schema, as when a ranking is pinned to the
+number of tasks."
   (writing-habit-coach--check)
   (let* ((prompts (or prompts (writing-habit-coach-prompts)))
          (spec (gethash task (gethash "tasks" prompts)))
          (system (concat (gethash "rules" prompts) " " (gethash "system" spec)))
          (user (concat (gethash "instruction" spec) "\n\n" facts))
-         (schema (gethash "schema" spec))
+         (schema (or schema (gethash "schema" spec)))
          (messages (vector `((role . "system") (content . ,system))
                            `((role . "user") (content . ,user))))
          (base (string-trim-right writing-habit-coach-url "/+"))
@@ -140,9 +142,10 @@ Use PROMPTS in place of the shared prompts file when it is given."
         (string-trim text)
       (error "The local model sent an empty reply"))))
 
-(defun writing-habit-coach-ask (task facts)
-  "Ask the model for TASK about FACTS and return the reply text or parsed JSON."
-  (let* ((request (writing-habit-coach-request task facts))
+(defun writing-habit-coach-ask (task facts &optional schema)
+  "Ask the model for TASK about FACTS and return the reply text or parsed JSON.
+SCHEMA, when given, replaces the schema of the prompts file."
+  (let* ((request (writing-habit-coach-request task facts nil schema))
          (url-request-method "POST")
          (url-request-extra-headers '(("Content-Type" . "application/json")))
          (url-request-data (cdr request))
@@ -162,7 +165,7 @@ Use PROMPTS in place of the shared prompts file when it is given."
     (kill-buffer buffer)
     (let ((text (writing-habit-coach-reply-text reply))
           (spec (gethash task (gethash "tasks" (writing-habit-coach-prompts)))))
-      (if (gethash "schema" spec)
+      (if (or schema (gethash "schema" spec))
           (let ((json-object-type 'hash-table)
                 (json-array-type 'list)
                 (json-key-type 'string))

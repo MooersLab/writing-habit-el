@@ -329,6 +329,30 @@ way next week, and puts the suggested blocks on the kill ring. When
 `writing-habit-coach-use-model` allows it, a local model words the note, and a
 note with a number the facts do not hold is replaced by the plain note.
 
+## Ranking, sizing, reading the weeks, and the coach comparison
+
+Four more commands in the Coach column follow the Python Coach menu, with the
+same rules and the same plain wording.
+
+- `O` runs `writing-habit-insights-rank`. It orders the grasscatcher tasks by
+  the nearest deadline of their project, then by the minutes planned for the
+  project this week, shows each with its reason, and asks whether to use the
+  order. A model, when allowed, may rank them instead, with a short reason for
+  each; a task it leaves out is kept at the end.
+- `z` runs `writing-habit-insights-size-week`. It suggests the median of the
+  minutes you actually wrote in up to eight recent planned weeks, rounded to
+  15 minutes. Two earlier weeks that share an event tag of this week, or three
+  that share its schedule code, are used in their place.
+- `i` runs `writing-habit-insights-read-weeks`. It finds the two groups of
+  weeks, by weekday, month, event tag, or schedule shape, with four or more
+  weeks behind them, whose share of the plan kept differs most from your
+  overall share, and proposes one change to the template. A model's sentence
+  is kept only when it states its pattern's percentage and adds no number of
+  its own.
+- `x` runs `writing-habit-insights-compare-coach`, which reports the share of
+  the plan kept in weeks with coach calls and in weeks without them, once each
+  side has two planned weeks.
+
 ## How edits keep the file intact
 
 Every edit goes through the model in `writing-habit-table.el`, a buffer-free

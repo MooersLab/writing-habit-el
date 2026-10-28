@@ -868,6 +868,9 @@ the wrong plan shape."
                    writing-habit-progress-seed-command writing-habit-progress-plan-next-week))
   (autoload command "writing-habit-progress" nil t))
 (autoload 'writing-habit-hours "writing-habit-hours" nil t)
+(dolist (command '(writing-habit-insights-rank writing-habit-insights-size-week
+                   writing-habit-insights-read-weeks writing-habit-insights-compare-coach))
+  (autoload command "writing-habit-insights" nil t))
 
 ;;;###autoload (autoload 'writing-habit-table-menu "writing-habit-table-mode" nil t)
 (transient-define-prefix writing-habit-table-menu ()
@@ -898,13 +901,17 @@ the wrong plan shape."
     ("R" "Rescue missed blocks" writing-habit-checks-rescue)
     ("W" "Ask about missed blocks" writing-habit-checks-misses)
     ("k" "Capture to the grasscatcher" writing-habit-helpers-capture)
+    ("O" "Rank the grasscatcher" writing-habit-insights-rank)
+    ("z" "Size this week's plan" writing-habit-insights-size-week)
     ("#" "Number a new project" writing-habit-helpers-number-project)
     ("T" "Triage carried projects" writing-habit-helpers-triage-carried)
     ("u" "Find stuck projects" writing-habit-helpers-find-stuck)
     ("w" "Plan next week from progress" writing-habit-progress-plan-next-week)
     ("M" "Monday message for my partner" writing-habit-checks-plan-message)
     ("f" "Summary for my partner" writing-habit-checks-partner)
-    ("y" "Semester review" writing-habit-checks-semester)]
+    ("y" "Semester review" writing-habit-checks-semester)
+    ("i" "Read my weeks" writing-habit-insights-read-weeks)
+    ("x" "Weeks with and without the coach" writing-habit-insights-compare-coach)]
    ["Views"
     ("h" "Hour view" writing-habit-hours)
     ("g" "Progress" writing-habit-progress)
