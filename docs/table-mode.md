@@ -353,6 +353,43 @@ same rules and the same plain wording.
   the plan kept in weeks with coach calls and in weeks without them, once each
   side has two planned weeks.
 
+## The Pomodoro timer
+
+`j` in the Views column runs `writing-habit-pomodoro-start`, which starts a
+cycle, pauses it, or resumes it, and `J` runs `writing-habit-pomodoro-stop`.
+The timer shows in the mode line, such as `[Pomodoro 2/4  18:07  Today: 5]`,
+red during a Pomodoro, green during a break, and amber while a phase waits.
+
+A cycle is Pomodoro, short break, Pomodoro, and so on, with a long break at the
+end. The number of Pomodoros comes from the block under way in the table, or
+the block on the row at point, or the block at point in the hour view: as many
+as fit with their short breaks, so a two-hour block holds four, 90 minutes
+three, and an hour two. Without a block the cycle holds four, and
+`writing-habit-pomodoro-auto-cycle` set to nil uses
+`writing-habit-pomodoro-per-cycle` instead. The lengths are
+`writing-habit-pomodoro-minutes` (25), `writing-habit-pomodoro-short-break` (5),
+and `writing-habit-pomodoro-long-break` (15). With
+`writing-habit-pomodoro-auto-next`, each phase starts by itself, and when the
+long break ends inside a block, the next cycle starts too.
+
+The timer ticks once a second during a Pomodoro and sounds a buzzer when a
+phase ends; both can be turned off, and each can play a file of your own. On a
+Mac, afplay plays them without stopping Emacs.
+
+Each finished Pomodoro adds one to the day's count, kept in
+`writing-habit-pomodoro-state-file`, so it survives a restart and starts over
+each morning. `writing-habit-pomodoro-mode`, which the first start turns on,
+writes the day's total at 11:59 PM to the table `writing-habit-pomodoro-db-table`
+(zzPomCount) of `mytime.db` in `writing-habit-pomodoro-db-dir`, one row per day,
+updating the row when a late Pomodoro ends. A day missed because Emacs was
+closed is written when the mode starts or the next Pomodoro ends.
+`writing-habit-pomodoro-record-today` writes today's count at once, to test the
+settings. The folder must exist, the table must be of its own shape (date,
+pom_count, recorded_at, with or without a leading ID), and the time tracker's
+zTimeSpent table is refused by name, so no other table is ever changed. The
+mode also binds `C-s-p` and `C-s-s`, Control Command P and S on a Mac, to start
+and stop the timer from anywhere.
+
 ## How edits keep the file intact
 
 Every edit goes through the model in `writing-habit-table.el`, a buffer-free

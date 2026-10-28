@@ -868,6 +868,9 @@ the wrong plan shape."
                    writing-habit-progress-seed-command writing-habit-progress-plan-next-week))
   (autoload command "writing-habit-progress" nil t))
 (autoload 'writing-habit-hours "writing-habit-hours" nil t)
+(dolist (command '(writing-habit-pomodoro-start writing-habit-pomodoro-stop
+                   writing-habit-pomodoro-record-today))
+  (autoload command "writing-habit-pomodoro" nil t))
 (dolist (command '(writing-habit-insights-rank writing-habit-insights-size-week
                    writing-habit-insights-read-weeks writing-habit-insights-compare-coach))
   (autoload command "writing-habit-insights" nil t))
@@ -916,7 +919,9 @@ the wrong plan shape."
     ("h" "Hour view" writing-habit-hours)
     ("g" "Progress" writing-habit-progress)
     ("U" "Update hours spent" writing-habit-progress-update)
-    ("A" "Add projects to progress" writing-habit-progress-seed-command)]
+    ("A" "Add projects to progress" writing-habit-progress-seed-command)
+    ("j" "Pomodoro start or pause" writing-habit-pomodoro-start)
+    ("J" "Pomodoro stop" writing-habit-pomodoro-stop)]
    ["Week"
     ("r" "Report" writing-habit-table-report)
     ("c" "Rename to canonical" writing-habit-table-rename-file)
