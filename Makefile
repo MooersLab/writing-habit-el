@@ -20,6 +20,7 @@ MODULES = writing-habit-db.el \
           writing-habit-plan.el \
           writing-habit-track.el \
           writing-habit-compare.el \
+          writing-habit-records.el \
           writing-habit-report.el \
           writing-habit-dashboard.el \
           writing-habit-context.el \

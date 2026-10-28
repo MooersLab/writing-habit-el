@@ -49,6 +49,7 @@
 (require 'writing-habit-db)
 (require 'writing-habit-lists)
 (require 'writing-habit-name)
+(require 'writing-habit-records)
 (require 'writing-habit-table)
 
 (declare-function writing-habit-table-current "writing-habit-table-mode")
@@ -677,42 +678,9 @@ at least `writing-habit-checks-min-reviews' ratings changes."
 
 ;;;; Block outcomes
 
-(defun writing-habit-checks-block-outcomes (db week-start &optional today)
-  "Return plists of each planned block of WEEK-START in DB and its status.
-The status is kept at half the planned minutes or more, partial below
-that, missed at none, and ahead for a block after TODAY."
-  (let* ((today (or today (writing-habit-checks--today)))
-         (blocks (sqlite-select db "SELECT b.day, b.start_time, b.end_time, b.planned_min, p.code, c.name
- FROM plan_block b JOIN project p USING(project_id) JOIN category c USING(category_id)
- WHERE b.week_start = ? ORDER BY b.day, b.start_time, p.code" (list week-start)))
-         (sessions (sqlite-select db "SELECT s.day, s.start_time, s.end_time, s.actual_min, p.code
- FROM session s JOIN project p USING(project_id) WHERE s.week_start = ?" (list week-start)))
-         (used '()) (out '()))
-    (dolist (b blocks)
-      (let ((first (writing-habit-checks--minute (nth 1 b)))
-            (last (writing-habit-checks--minute (nth 2 b)))
-            (planned (nth 3 b)) (actual 0) (index -1))
-        (dolist (s sessions)
-          (setq index (1+ index))
-          (when (and (equal (nth 0 s) (nth 0 b)) (equal (nth 4 s) (nth 4 b)))
-            (let ((s-first (writing-habit-checks--minute (nth 1 s)))
-                  (s-last (writing-habit-checks--minute (nth 2 s))))
-              (if (or (null s-first) (null s-last))
-                  (let ((key (list (nth 0 b) (nth 4 b) index)))
-                    (unless (member key used)
-                      (push key used)
-                      (cl-incf actual (min (nth 3 s) planned))))
-                (when (<= s-last s-first) (cl-incf s-last (* 24 60)))
-                (cl-incf actual (max 0 (- (min last s-last) (max first s-first))))))))
-        (setq actual (min actual planned))
-        (push (list :day (nth 0 b) :start (nth 1 b) :end (nth 2 b) :planned planned
-                    :code (nth 4 b) :category (nth 5 b) :actual actual
-                    :status (cond ((string< today (nth 0 b)) "ahead")
-                                  ((= actual 0) "missed")
-                                  ((>= actual (* 0.5 planned)) "kept")
-                                  (t "partial")))
-              out)))
-    (nreverse out)))
+(defalias 'writing-habit-checks-block-outcomes #'writing-habit-records-block-outcomes
+  "Return plists of each planned block of a week and its status.
+See `writing-habit-records-block-outcomes'.")
 
 ;;;; Missed-block rescue (Rule 9)
 
@@ -902,56 +870,9 @@ LEGEND is an alist of (CODE . DESCRIPTION) that gives the deadlines."
           (setq best item best-key k))))
     best))
 
-(defun writing-habit-checks-personal-bests (db week-start)
-  "Return (LABEL VALUE WEEK THIS-WEEK) for each personal best up to WEEK-START."
-  (let* ((weeks (sqlite-select db "SELECT week_start, planned_min, actual_min, adherence
- FROM v_week_overall WHERE week_start <= ? ORDER BY week_start" (list week-start)))
-         (planned (seq-filter (lambda (w) (and (nth 1 w) (> (nth 1 w) 0) (nth 3 w))) weeks))
-         (out '()))
-    (when planned
-      (let ((best (writing-habit-checks--first-max
-                   (lambda (w) (list (min (nth 3 w) 1.0) (nth 2 w))) planned)))
-        (push (list "Most of the plan kept" (format "%d%%" (round (* (min (nth 3 best) 1.0) 100)))
-                    (nth 0 best) (equal (nth 0 best) week-start))
-              out)))
-    (when weeks
-      (let ((best (writing-habit-checks--first-max (lambda (w) (list (nth 2 w))) weeks)))
-        (when (> (nth 2 best) 0)
-          (push (list "Most minutes written" (format "%d h %02d min" (/ (nth 2 best) 60) (% (nth 2 best) 60))
-                      (nth 0 best) (equal (nth 0 best) week-start))
-                out))))
-    (let ((run 0) (longest 0) (longest-end nil) (previous nil))
-      (dolist (row (sqlite-select db "SELECT day FROM v_day_actual WHERE worked = 1 AND week_start <= ?
- ORDER BY day" (list week-start)))
-        (let ((day (writing-habit-checks--abs (car row))))
-          (setq run (if (and previous (= (- day previous) 1)) (1+ run) 1))
-          (when (> run longest) (setq longest run longest-end day))
-          (setq previous day)))
-      (when (> longest 0)
-        (let* ((weekday (mod (1- (calendar-day-of-week
-                                  (calendar-gregorian-from-absolute longest-end)))
-                             7))
-               (end-week (writing-habit-checks--iso (- longest-end weekday))))
-          (push (list "Longest run of writing days"
-                      (format "%d day%s" longest (if (= longest 1) "" "s"))
-                      end-week (equal end-week week-start))
-                out))))
-    (when (member "v_week_review" (writing-habit-checks--tables db))
-      (let* ((rows (sqlite-select db "SELECT week_start, met, mean_focus, reviews FROM v_week_review
- WHERE week_start <= ?" (list week-start)))
-             (met (seq-filter (lambda (r) (and (nth 1 r) (> (nth 1 r) 0))) rows))
-             (focused (seq-filter (lambda (r) (and (nth 2 r) (>= (nth 3 r) 3))) rows)))
-        (when met
-          (let ((best (writing-habit-checks--first-max (lambda (r) (list (nth 1 r))) met)))
-            (push (list "Most objectives met" (number-to-string (nth 1 best))
-                        (nth 0 best) (equal (nth 0 best) week-start))
-                  out)))
-        (when focused
-          (let ((best (writing-habit-checks--first-max (lambda (r) (list (nth 2 r))) focused)))
-            (push (list "Most focused week" (format "%.1f of 5" (nth 2 best))
-                        (nth 0 best) (equal (nth 0 best) week-start))
-                  out)))))
-    (nreverse out)))
+(defalias 'writing-habit-checks-personal-bests #'writing-habit-records-personal-bests
+  "Return (LABEL VALUE WEEK THIS-WEEK) for each personal best.
+See `writing-habit-records-personal-bests'.")
 
 (defun writing-habit-checks-partner-week (db week-start &optional today)
   "Collect the numbers of the week starting WEEK-START in DB for a partner.

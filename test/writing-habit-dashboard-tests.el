@@ -105,5 +105,51 @@
         (should (equal (writing-habit-dashboard-html db "2026-01-19") expected))
       (writing-habit-db-close db))))
 
+
+(defconst writing-habit-dashboard-tests--intensity-sql
+  (expand-file-name "fixtures/intensity.sql" writing-habit-dashboard-tests--dir)
+  "Records with objectives, reviews, earlier weeks, and coach calls.")
+
+(defconst writing-habit-dashboard-tests--intensity-html
+  (expand-file-name "fixtures/intensity.html" writing-habit-dashboard-tests--dir)
+  "The dashboard the Python port renders for those records on 2026-10-14.")
+
+(defun writing-habit-dashboard-tests--intensity-db ()
+  "Return an in-memory database holding the intensity records."
+  (let ((db (writing-habit-db-connect)))
+    (writing-habit-db-init db writing-habit-dashboard-tests--schema)
+    (with-temp-buffer
+      (insert-file-contents writing-habit-dashboard-tests--intensity-sql)
+      (dolist (line (split-string (buffer-string) "\n" t))
+        (sqlite-execute db line)))
+    db))
+
+(ert-deftest writing-habit-dashboard-intensity-matches-python ()
+  "The personal bests, the coach comparison, and the done list match the Python render."
+  (skip-unless (sqlite-available-p))
+  (let ((db (writing-habit-dashboard-tests--intensity-db))
+        (expected (with-temp-buffer
+                    (insert-file-contents writing-habit-dashboard-tests--intensity-html)
+                    (buffer-string))))
+    (unwind-protect
+        (let ((html (writing-habit-dashboard-html db "2026-10-14" "2026-10-14")))
+          (should (string-search "<h2>Personal bests</h2>" html))
+          (should (string-search "<div class=\"tile best now\"><div class=\"v\">3.7 of 5</div>" html))
+          (should (string-search "<p class=\"sub\">Weeks with the coach: 2, 88% of the plan kept." html))
+          (should (string-search "<b>A</b> Draft the &lt;aims&gt; &amp; scope</li>" html))
+          (should (string-search "<tr class=\"ahead\"><th class=\"time\">Fri</th>" html))
+          (should (equal html expected)))
+      (writing-habit-db-close db))))
+
+(ert-deftest writing-habit-dashboard-intensity-waits-for-records ()
+  "A week with one plan, no review, and no coach comparison shows no intensity section."
+  (skip-unless (sqlite-available-p))
+  (let ((db (writing-habit-dashboard-tests--fixture)))
+    (unwind-protect
+        (let ((html (writing-habit-dashboard-html db "2026-01-19")))
+          (should-not (string-search "Personal bests" html))
+          (should-not (string-search "Done this week" html)))
+      (writing-habit-db-close db))))
+
 (provide 'writing-habit-dashboard-tests)
 ;;; writing-habit-dashboard-tests.el ends here

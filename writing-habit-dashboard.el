@@ -55,6 +55,7 @@
 (require 'subr-x)
 (require 'writing-habit-db)
 (require 'writing-habit-compare)
+(require 'writing-habit-records)
 
 (declare-function org-read-date "org" (&rest args))
 
@@ -430,10 +431,121 @@ Each row is (offset start end code activity)."
                                   "%.</p>")))))))
 
 
+;;;; Work intensity: personal bests and the done list
+
+(defconst writing-habit-dashboard--intensity-style
+  "  <style>
+    .best .w { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .best.now { border-color: var(--actual); }
+    .best.now .w { color: var(--ink2); font-weight: 600; }
+    ul.done { margin: 4px 0 0; padding: 12px 16px 12px 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+    ul.done li { margin: 3px 0; font-size: 13px; }
+    tr.missed td, tr.missed th { color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
+    tr.ahead td, tr.ahead th { color: var(--muted); }
+  </style>"
+  "The style of the work-intensity sections, verbatim from the Python twin.
+It is emitted with the sections, which appear only when there is
+something to show, so a database without reviews renders the same bytes
+as before.")
+
+(defconst writing-habit-dashboard--status-text
+  '(("kept" . "kept") ("partial" . "partly kept") ("missed" . "missed") ("ahead" . "still ahead"))
+  "The words shown for each block status.")
+
+(defun writing-habit-dashboard--day-label (day week-start)
+  "Return the short day name of DAY in the week of WEEK-START, or DAY itself."
+  (let ((offset (- (writing-habit-records--abs day) (writing-habit-records--abs week-start))))
+    (if (and (>= offset 0) (< offset 7))
+        (aref writing-habit-dashboard--day-labels offset)
+      day)))
+
+(defun writing-habit-dashboard--bests (bests)
+  "Return the lines of the personal-best tiles for BESTS."
+  (when bests
+    (append
+     (list "  <h2>Personal bests</h2>" "  <section class=\"tiles\">")
+     (mapcar (lambda (best)
+               (format "    <div class=\"%s\"><div class=\"v\">%s</div><div class=\"k\">%s</div><div class=\"w\">%s</div></div>"
+                       (if (nth 3 best) "tile best now" "tile best")
+                       (writing-habit-dashboard--esc (nth 1 best))
+                       (writing-habit-dashboard--esc (nth 0 best))
+                       (if (nth 3 best) "set this week"
+                         (concat "week of " (writing-habit-dashboard--esc (nth 2 best))))))
+             bests)
+     (list "  </section>"))))
+
+(defun writing-habit-dashboard--done (done outcomes week-start)
+  "Return the lines of the done list DONE and the table of OUTCOMES for WEEK-START."
+  (let ((out (list "  <h2>Done this week</h2>")))
+    (if done
+        (setq out (append out (list "  <ul class=\"done\">")
+                          (mapcar (lambda (item)
+                                    (format "    <li><span class=\"time\">%s %s</span> <b>%s</b> %s</li>"
+                                            (writing-habit-dashboard--day-label (plist-get item :day) week-start)
+                                            (writing-habit-dashboard--esc (plist-get item :start))
+                                            (writing-habit-dashboard--esc (plist-get item :code))
+                                            (writing-habit-dashboard--esc (plist-get item :text))))
+                                  done)
+                          (list "  </ul>")))
+      (setq out (append out (list (concat "  <p class=\"sub\">No objectives checked off yet. Set one to three "
+                                          "for a block, and they gather here as you meet them.</p>")))))
+    (when outcomes
+      (setq out
+            (append out
+                    (list "  <table>"
+                          (concat "    <caption>Every planned block. A missed block is grey, as "
+                                  "information for next week's plan.</caption>")
+                          (concat "    <thead><tr><th>Day</th><th>Time</th><th>Code</th>"
+                                  "<th class=\"num\">Planned</th><th class=\"num\">Actual</th><th>Status</th>"
+                                  "<th class=\"num\">Objectives</th><th class=\"num\">Focus</th></tr></thead>")
+                          "    <tbody>")
+                    (mapcar (lambda (r)
+                              (let* ((status (plist-get r :status))
+                                     (rev (plist-get r :review))
+                                     (objectives (if (plist-get rev :committed)
+                                                     (format "%s of %s" (plist-get rev :met) (plist-get rev :committed))
+                                                   ""))
+                                     (focus (if (plist-get rev :focus) (format "%s of 5" (plist-get rev :focus)) "")))
+                                (format "      <tr%s><th class=\"time\">%s</th><td class=\"time\">%s-%s</td><td class=\"cell\">%s</td><td class=\"num\">%d</td><td class=\"num\">%d</td><td>%s</td><td class=\"num\">%s</td><td class=\"num\">%s</td></tr>"
+                                        (if (member status '("missed" "ahead")) (format " class=\"%s\"" status) "")
+                                        (writing-habit-dashboard--day-label (plist-get r :day) week-start)
+                                        (writing-habit-dashboard--esc (plist-get r :start))
+                                        (writing-habit-dashboard--esc (plist-get r :end))
+                                        (writing-habit-dashboard--esc (plist-get r :code))
+                                        (plist-get r :planned) (plist-get r :actual)
+                                        (cdr (assoc status writing-habit-dashboard--status-text))
+                                        objectives focus)))
+                            outcomes)
+                    (list "    </tbody>" "  </table>"))))
+    out))
+
+(defun writing-habit-dashboard--intensity (db week-start &optional today)
+  "Return the personal bests, coach comparison, and done list for WEEK-START.
+DB is the habit database, and TODAY separates missed blocks from blocks
+still ahead.  Return nil when there is nothing to show."
+  (let* ((bests (when (>= (writing-habit-records-planned-weeks db week-start) 2)
+                  (writing-habit-records-personal-bests db week-start)))
+         (records (writing-habit-records-has-records db week-start))
+         (compared (writing-habit-records-comparison db week-start)))
+    (when (or bests records compared)
+      (append (list writing-habit-dashboard--intensity-style)
+              (writing-habit-dashboard--bests bests)
+              (when compared
+                (list (concat "  <p class=\"sub\">"
+                              (writing-habit-records-comparison-text compared) "</p>")))
+              (when records
+                (writing-habit-dashboard--done
+                 (writing-habit-records-done-list db week-start)
+                 (writing-habit-records-block-outcomes db week-start today)
+                 week-start))))))
+
+
 ;;;; Assembly
 
-(defun writing-habit-dashboard-html (db week)
-  "Return a self-contained HTML dashboard from DB for the week containing WEEK."
+(defun writing-habit-dashboard-html (db week &optional today)
+  "Return a self-contained HTML dashboard from DB for the week containing WEEK.
+TODAY, an ISO date, separates missed blocks from blocks still ahead in the
+done list; it defaults to the real date."
   (let* ((week-start (writing-habit-compare--monday week))
          (proj (writing-habit-compare-week-project db week))
          (cat (writing-habit-compare-week-category db week))
@@ -466,6 +578,7 @@ Each row is (offset start end code activity)."
     (setq lines (append lines (writing-habit-dashboard--projects proj)))
     (setq lines (append lines (writing-habit-dashboard--activities cat)))
     (setq lines (append lines (writing-habit-dashboard--barbell bar)))
+    (setq lines (append lines (writing-habit-dashboard--intensity db week-start today)))
     (setq lines (append lines (list
                                (concat "  <p class=\"foot\">Generated by writing-habit from the"
                                        " shared SQLite database. Planned versus actual,"
@@ -477,10 +590,11 @@ Each row is (offset start end code activity)."
                                "")))
     (mapconcat #'identity lines "\n")))
 
-(defun writing-habit-dashboard-write (db week out-path)
-  "Render the dashboard for WEEK from DB, write it to OUT-PATH, return OUT-PATH."
+(defun writing-habit-dashboard-write (db week out-path &optional today)
+  "Render the dashboard for WEEK from DB, write it to OUT-PATH, return OUT-PATH.
+TODAY is passed to `writing-habit-dashboard-html'."
   (with-temp-file out-path
-    (insert (writing-habit-dashboard-html db week)))
+    (insert (writing-habit-dashboard-html db week today)))
   out-path)
 
 ;;;###autoload

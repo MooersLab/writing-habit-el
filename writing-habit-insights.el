@@ -49,6 +49,7 @@
 (require 'writing-habit-coach)
 (require 'writing-habit-checks)
 (require 'writing-habit-lists)
+(require 'writing-habit-records)
 (require 'writing-habit-table)
 
 (declare-function writing-habit-table-current "writing-habit-table-mode")
@@ -594,31 +595,13 @@ nil when there is no earlier planned week."
 
 ;;;; Weeks with the coach and without it (Rule 10)
 
-(defun writing-habit-insights-comparison (db &optional end-week)
-  "Compare the plan kept in DB in weeks with and without the coach.
-Only weeks up to END-WEEK count.  Return a plist, or nil until each side
-has two planned weeks."
-  (when (sqlite-select db "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_log'")
-    (let* ((with-ai (mapcar #'car (sqlite-select db "SELECT DISTINCT week_start FROM ai_log WHERE week_start IS NOT NULL")))
-           (rows (sqlite-select db (concat "SELECT week_start, planned_min, actual_min FROM v_week_overall"
-                                           " WHERE planned_min > 0"
-                                           (if end-week " AND week_start <= ?" ""))
-                                (if end-week (list end-week) nil)))
-           (on (seq-filter (lambda (r) (member (car r) with-ai)) rows))
-           (off (seq-remove (lambda (r) (member (car r) with-ai)) rows))
-           (kept (lambda (group) (writing-habit-insights--round
-                                  (/ (float (apply #'+ (mapcar #'caddr group)))
-                                     (apply #'+ (mapcar #'cadr group)))
-                                  2))))
-      (when (and (>= (length on) 2) (>= (length off) 2))
-        (list :with-ai (length on) :with-ai-kept (funcall kept on)
-              :without-ai (length off) :without-ai-kept (funcall kept off))))))
+(defalias 'writing-habit-insights-comparison #'writing-habit-records-comparison
+  "Compare the plan kept in weeks with and without the coach.
+See `writing-habit-records-comparison'.")
 
-(defun writing-habit-insights-comparison-text (compared)
-  "Write COMPARED as the sentence of the Python dashboard."
-  (format "Weeks with the coach: %d, %d%% of the plan kept. Weeks without it: %d, %d%% kept. A few weeks on each side describe your record. They do not prove that the coach helped."
-          (plist-get compared :with-ai) (writing-habit-insights--pct (plist-get compared :with-ai-kept))
-          (plist-get compared :without-ai) (writing-habit-insights--pct (plist-get compared :without-ai-kept))))
+(defalias 'writing-habit-insights-comparison-text #'writing-habit-records-comparison-text
+  "Write a comparison as the sentence of the Python dashboard.
+See `writing-habit-records-comparison-text'.")
 
 ;;;###autoload
 (defun writing-habit-insights-compare-coach ()

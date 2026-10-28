@@ -62,6 +62,30 @@ ink, never by color alone, and the schedule is a labeled table, so the page
 reads without relying on color. The dashboard rounds the speculative-share
 percent half up, so a share of 12.5 percent reads as 13.
 
+### Personal bests and the done list
+
+Below the barbell split, the page adds a work-intensity part once the record
+holds something to show, the same part the Python twin draws.
+
+- **Personal bests**, once two weeks carry a plan: the most of the plan kept,
+  the most minutes written, the longest run of writing days, the most
+  objectives met, and the most focused week, each with the week that set it. A
+  best set this week is outlined and says so.
+- A sentence comparing the share of the plan kept in weeks with coach calls
+  and in weeks without them, once each side has two planned weeks.
+- **Done this week**, once the week holds an objective or a review: the
+  objectives met, in day and time order, and a table of every planned block
+  with its planned and actual minutes, its status, and the objectives and
+  focus of its review. A block is kept at half its planned minutes or more,
+  partly kept below that, and missed at none; a missed block is grey, and a
+  block after today is marked still ahead.
+
+The part brings its own style and appears only when it has something to show,
+so a database without reviews renders the same bytes as before. A second frozen
+render, `test/fixtures/intensity.html`, made by the Python twin from the
+records in `test/fixtures/intensity.sql`, holds the Emacs output to the same
+bytes for this part.
+
 ## The seasons dashboard
 
 A second dashboard groups adherence across many weeks rather than within one.
