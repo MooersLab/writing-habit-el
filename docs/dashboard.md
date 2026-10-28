@@ -40,7 +40,13 @@ same chart directly to a PNG for batch use. The plot needs `python3` with
 ## The HTML dashboard
 
 `M-x writing-habit-dashboard` writes a self-contained page and opens it in a
-browser. The page embeds its own style and script, so it opens with no server
+browser. It first copies any new sessions from the `zTimeSpent` table of
+`writing-habit-track-mytime-db`, as `writing-habit-track-sync-mytime-file` does,
+so the actual minutes are up to date; the Compare menu's dashboard does the
+same. The tracker is only read, a session copied before is skipped, and the
+echo area says how many sessions were new. Set
+`writing-habit-dashboard-sync-mytime` to nil to draw from the habit database as
+it stands. The page embeds its own style and script, so it opens with no server
 and no network request. The page has five sections below the summary tiles,
 namely a trend of overall adherence over recent weeks, the week's schedule
 redrawn as a time-by-day grid colored by activity, the planned-versus-actual

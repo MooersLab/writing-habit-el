@@ -406,5 +406,24 @@
       (should (string-match-p "inserted 4, updated 0, unchanged 0" text))
       (should (string-match-p "    6005EveningCommute +30$" text)))))
 
+
+(ert-deftest writing-habit-track-sync/dashboard-syncs-first ()
+  "The dashboard copies new sessions from mytime.db before it is drawn."
+  (require 'writing-habit-dashboard)
+  (writing-habit-track-tests--with-sync (db src _table dir)
+    (let ((writing-habit-track-mytime-db src)
+          (writing-habit-dashboard-sync-mytime t))
+      (should (equal (writing-habit-dashboard-sync db)
+                     "Synced mytime.db: 4 new, 0 updated, 0 unchanged sessions"))
+      (should (string-search "<div class=\"tile\"><div class=\"v\">405</div><div class=\"k\">actual minutes</div></div>"
+                             (writing-habit-dashboard-html db "2026-10-05" "2026-10-09")))
+      (should (equal (writing-habit-dashboard-sync db)
+                     "Synced mytime.db: 0 new, 0 updated, 4 unchanged sessions")))
+    (let ((writing-habit-track-mytime-db src)
+          (writing-habit-dashboard-sync-mytime nil))
+      (should-not (writing-habit-dashboard-sync db)))
+    (let ((writing-habit-track-mytime-db (expand-file-name "missing.db" dir)))
+      (should-not (writing-habit-dashboard-sync db)))))
+
 (provide 'writing-habit-track-tests)
 ;;; writing-habit-track-tests.el ends here

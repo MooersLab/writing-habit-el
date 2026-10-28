@@ -56,6 +56,7 @@
 (require 'writing-habit-db)
 (require 'writing-habit-compare)
 (require 'writing-habit-records)
+(require 'writing-habit-track)
 
 (declare-function org-read-date "org" (&rest args))
 
@@ -597,19 +598,49 @@ TODAY is passed to `writing-habit-dashboard-html'."
     (insert (writing-habit-dashboard-html db week today)))
   out-path)
 
+(defcustom writing-habit-dashboard-sync-mytime t
+  "Non-nil copies new sessions from mytime.db before the dashboard is drawn.
+The sessions come from the zTimeSpent table of
+`writing-habit-track-mytime-db', as \\[writing-habit-track-sync-mytime-file]
+copies them, so the actual minutes are up to date.  The sync reads the
+tracker only and skips a session it has copied before.  With nil, or
+when that file does not exist, the dashboard shows the sessions the
+habit database already holds."
+  :type 'boolean
+  :group 'writing-habit)
+
+(defun writing-habit-dashboard-sync (db)
+  "Copy new sessions from mytime.db into DB, if the sync is turned on.
+Return a one-line note of what the sync did, or nil when it did not run.
+A sync that fails gives a note saying why, and the dashboard is still
+drawn from what DB holds."
+  (let ((source (expand-file-name writing-habit-track-mytime-db)))
+    (when (and writing-habit-dashboard-sync-mytime (file-regular-p source))
+      (condition-case err
+          (let ((report (writing-habit-track-sync-mytime db source)))
+            (format "Synced %s: %d new, %d updated, %d unchanged sessions"
+                    (file-name-nondirectory source)
+                    (writing-habit-sync-inserted report)
+                    (writing-habit-sync-updated report)
+                    (writing-habit-sync-unchanged report)))
+        (error (format "Could not sync %s, so the dashboard uses the sessions already copied: %s"
+                       (file-name-nondirectory source) (error-message-string err)))))))
+
 ;;;###autoload
 (defun writing-habit-dashboard (db-file week out-file)
   "Write an HTML dashboard for WEEK from the database at DB-FILE to OUT-FILE.
-Interactively, prompt for each, then open the dashboard in a browser."
+Interactively, prompt for each, then open the dashboard in a browser.
+New sessions are first copied from mytime.db; see
+`writing-habit-dashboard-sync-mytime'."
   (interactive
    (list (read-file-name "Database file: " nil nil t)
          (org-read-date nil nil nil "Any date in the target week: ")
          (read-file-name "Write dashboard to (html): " nil "writing-dashboard.html")))
   (let ((db (writing-habit-db-connect db-file)))
     (unwind-protect
-        (progn
+        (let ((synced (writing-habit-dashboard-sync db)))
           (writing-habit-dashboard-write db week out-file)
-          (message "Wrote dashboard to %s" out-file)
+          (message "%sWrote dashboard to %s" (if synced (concat synced ". ") "") out-file)
           (when (called-interactively-p 'interactive)
             (browse-url (concat "file://" (expand-file-name out-file))))
           out-file)

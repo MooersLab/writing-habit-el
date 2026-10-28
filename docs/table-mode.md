@@ -282,8 +282,8 @@ The Views column of the `C-c C-;` menu opens two dashboards of the open week.
 
 `h` runs `writing-habit-hours`, which shows the week as one row per hour and
 one column per day. A block is named in the hour it starts, with its activity
-letter, code, and times, such as `gA 05:00-06:30`, and shows `↓ A` in the
-further hours it fills. Each project keeps one colour, a free hour shows a dot,
+letter, code, and times, such as `gA 05:00-06:30`, and shows only `↓` in the
+further hours it fills, so the grid stays quiet; the colour says whose block it is. Each project keeps one colour, a free hour shows a dot,
 and the last row gives each day's planned minutes. `RET` on a block jumps to its
 cell in the table, and `g` redraws.
 

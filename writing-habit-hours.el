@@ -33,7 +33,8 @@
 ;;
 ;; A block is named in the hour it starts, with its activity letter, its
 ;; project code, and its times, such as gA 05:00-06:30, and each further
-;; hour it fills shows a down arrow.  Each project keeps one colour, and
+;; hour it fills shows only a down arrow, as in the Python hour view, so the
+;; grid stays quiet; the colour says whose block it is.  Each project keeps one colour, and
 ;; an hour with no block shows a dot.  The last row gives the planned
 ;; minutes of each day.  RET on a block jumps to its cell in the table.
 ;;
@@ -101,7 +102,7 @@ It is the code and times when STARTS is non-nil, else an arrow."
     (if starts
         (format "%s%s %s-%s" letter (writing-habit-table-block-letter block)
                 (writing-habit-table-block-start block) (writing-habit-table-block-end block))
-      (format "↓ %s" (writing-habit-table-block-letter block)))))
+      "↓")))
 
 (defun writing-habit-hours--color (code codes)
   "Return the background colour of project CODE among CODES."

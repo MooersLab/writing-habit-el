@@ -449,6 +449,12 @@ The file option names the mytime.db; when it is unset or not a database,
   "Write the single-week HTML dashboard."
   (interactive (list (transient-args 'writing-habit-dispatch-compare)))
   (writing-habit-dispatch--require args "db" "week" "out")
+  ;; Bring the actual minutes up to date first, as the command does.
+  (require 'writing-habit-dashboard)
+  (let* ((db (writing-habit-db-connect (writing-habit-dispatch--arg args "db")))
+         (synced (unwind-protect (writing-habit-dashboard-sync db)
+                   (writing-habit-db-close db))))
+    (when synced (message "%s" synced)))
   (writing-habit-dispatch-run-habit
    '("dashboard")
    (seq-filter (lambda (a) (string-match-p "\\`--\\(db\\|week\\|out\\)=" a)) args)
