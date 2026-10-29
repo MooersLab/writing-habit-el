@@ -229,7 +229,10 @@ figure."
                                (writing-habit-report--num r "actual_min")))
                        cat))
               out)))
-    (let ((bar (writing-habit-compare-week-barbell db week)))
+    (let* ((bar (writing-habit-compare-week-barbell db week))
+           (prospect (writing-habit-compare-week-prospecting db week))
+           (prospect-min (apply #'+ (mapcar (lambda (r) (cdr (assoc "actual_min" r)))
+                                            prospect))))
       (when bar
         (cl-flet ((sum-for (risk field)
                     (apply #'+ (mapcar (lambda (r) (cdr (assoc field r)))
@@ -255,7 +258,38 @@ figure."
             (push (format "Speculative share: planned %s, actual %s."
                           (writing-habit-report--pct spec-plan p-plan)
                           (writing-habit-report--pct spec-act p-act))
-                  out)))))
+                  out)
+            (when (> prospect-min 0)
+              (push (format (concat "Counting %d minutes of risky prospecting with the"
+                                    " speculative work, the risky share of actual time is %s.")
+                            prospect-min
+                            (writing-habit-report--pct (+ spec-act prospect-min)
+                                                       (+ p-act prospect-min)))
+                    out)))))
+      (when prospect
+        (push "" out)
+        (push "* Risky prospecting" out)
+        (push (concat "#+CAPTION: Tracked work on projects on neither the week's legend nor"
+                      " the semester lists. It is left out of planned versus actual above.")
+              out)
+        (push "#+ATTR_LATEX: :booktabs t" out)
+        (push (writing-habit-report--table
+               '("Project" "Sessions" "Minutes" "Weeks so far")
+               (mapcar (lambda (r)
+                         (let ((d (cdr (assoc "description" r))))
+                           (list (if (and d (not (equal d ""))) d (cdr (assoc "code" r)))
+                                 (writing-habit-report--num r "sessions")
+                                 (writing-habit-report--num r "actual_min")
+                                 (writing-habit-report--num r "weeks_so_far"))))
+                       prospect))
+              out)
+        (push (format (concat "%d minutes, %s of the week's tracked writing. Prospecting"
+                              " like this has a high risk of being abandoned for lack of"
+                              " time. Add a project worth keeping to a semester list and"
+                              " give it a block, or let it go.")
+                      prospect-min
+                      (writing-habit-report--pct prospect-min (+ actual-total prospect-min)))
+              out)))
     (push "" out)
     (push (format "* Current streak of consecutive writing days: %d"
                   (writing-habit-compare-current-streak db))

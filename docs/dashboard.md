@@ -92,6 +92,34 @@ render, `test/fixtures/intensity.html`, made by the Python twin from the
 records in `test/fixtures/intensity.sql`, holds the Emacs output to the same
 bytes for this part.
 
+### Risky prospecting
+
+A third part follows the barbell split when the week has risky prospecting.
+This is tracked work on a writing project that is on neither the week's legend
+nor the semester lists, which the mytime.db sync labels. These are usually
+prospecting efforts, and they carry a high risk of being abandoned for lack of
+time, so the dashboard counts them on their own.
+
+The part opens with the total minutes and their share of all the week's tracked
+writing. A table lists each project with its sessions, its minutes, its share,
+and the number of weeks it has been prospected so far. A project prospected for
+three weeks or more (`writing-habit-dashboard-stale-weeks`) is drawn in orange,
+because it has gone unplanned long enough to call for a decision. Add it to a
+semester list and give it a block, or let it go.
+
+Prospecting is left out of the planned-versus-actual table, the activity
+balance, the overall adherence, and the trend, because there is no plan to
+measure it against. The barbell split gains a "risky prospecting" row with zero
+planned minutes, and a line gives the risky share of actual time when the
+prospecting is counted with the speculative work. The streak still counts a day
+of prospecting as a day of writing. The org report carries a "Risky
+prospecting" heading with the same table.
+
+The part appears only when the week has prospecting, so the other fixtures
+render the same bytes as before. A frozen render, `test/fixtures/prospect.html`,
+made by the Python twin from `test/fixtures/prospect.db`, holds the Emacs output
+to the same bytes for this part.
+
 ## The seasons dashboard
 
 A second dashboard groups adherence across many weeks rather than within one.

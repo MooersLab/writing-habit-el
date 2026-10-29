@@ -43,6 +43,8 @@
 ;; Public functions, matching their Python counterparts:
 ;;   `writing-habit-db-connect'             open a connection, foreign keys on
 ;;   `writing-habit-db-init'                load the schema, seed activities
+;;   `writing-habit-db-migrate'             upgrade an older database in place
+;;   `writing-habit-db-has-prospecting'     does session carry the prospecting flag
 ;;   `writing-habit-db-get-category-id'     name -> category id or nil
 ;;   `writing-habit-db-get-or-create-project'  legend code -> project id
 ;;   `writing-habit-db-log-import'          record an import's provenance
@@ -113,9 +115,43 @@ shared schema.sql, whose string literals contain no semicolons."
                       (unless (string-empty-p trimmed) trimmed)))
                   parts))))
 
+(defconst writing-habit-db-prospecting-views
+  '("v_week_project" "v_week_category" "v_week_overall" "v_week_project_category")
+  "The views that leave risky prospecting out of the plan comparisons.
+A database made before the session.prospecting column holds older
+definitions of them, which are dropped and rebuilt when the column is
+added.")
+
+(defun writing-habit-db--columns (db table)
+  "Return the column names of TABLE in DB, or nil when there is no TABLE."
+  (mapcar #'cadr (sqlite-select db (format "PRAGMA table_info(%s)" table))))
+
+(defun writing-habit-db-has-prospecting (db)
+  "Return non-nil when the session table of DB carries the prospecting flag."
+  (and (member "prospecting" (writing-habit-db--columns db "session")) t))
+
+(defun writing-habit-db-migrate (db)
+  "Bring the older database DB up to the current schema.
+Return non-nil when it changed.  A session table made before risky
+prospecting was labeled gains the prospecting column, with every existing
+row marked as not prospecting, and the comparison views that read the
+column are dropped so `writing-habit-db-init' rebuilds them.  A database
+with no session table yet is left for `writing-habit-db-init' to create.
+This ports `migrate' in db.py."
+  (let ((cols (writing-habit-db--columns db "session")))
+    (when (and cols (not (member "prospecting" cols)))
+      (sqlite-execute db (concat "ALTER TABLE session ADD COLUMN prospecting INTEGER"
+                                 " NOT NULL DEFAULT 0 CHECK (prospecting IN (0,1))"))
+      (dolist (view writing-habit-db-prospecting-views)
+        (sqlite-execute db (format "DROP VIEW IF EXISTS %s" view)))
+      t)))
+
 (defun writing-habit-db-init (db &optional schema-file)
   "Create the schema in DB and seed the three activities.  Safe to run twice.
-SCHEMA-FILE defaults to `writing-habit-db-schema-file'."
+SCHEMA-FILE defaults to `writing-habit-db-schema-file'.  An older
+database is migrated first, so the views the schema creates find the
+columns they read."
+  (writing-habit-db-migrate db)
   (let ((sql (with-temp-buffer
                (insert-file-contents (or schema-file writing-habit-db-schema-file))
                (buffer-string))))

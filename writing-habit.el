@@ -207,17 +207,26 @@ entry point, factored out so it can be tested directly."
                 (db (writing-habit-db-connect (writing-habit--req opts "db"))))
             (unless source
               (error "Usage: track sync MYTIME.DB --db DB [--since DAY] [--until DAY] %s"
-                     "[--scope semester|legend|all] [--table FILE] [--dry-run]"))
+                     (concat "[--scope semester|legend|all] [--table FILE]"
+                             " [--prospect-range RANGES|none] [--dry-run]")))
             (unwind-protect
                 (let* ((since (or (writing-habit--opt opts "since")
                                   (writing-habit-track-default-since db)))
                        (until (writing-habit--opt opts "until"))
                        (dry (writing-habit--opt opts "dry-run"))
+                       (ranges (writing-habit--opt opts "prospect-range"))
                        (report (writing-habit-track-sync-mytime
                                 db source :since since :until until
                                 :scope (or (writing-habit--opt opts "scope") "semester")
                                 :table (writing-habit--opt opts "table")
-                                :dry-run dry)))
+                                :dry-run dry
+                                :prospect-ranges
+                                (cond ((not (stringp ranges))
+                                       writing-habit-track-prospect-ranges)
+                                      ((member (downcase (string-trim ranges))
+                                               '("" "none" "off"))
+                                       "")
+                                      (t ranges)))))
                   (writing-habit-track-sync-report-string report source since until dry))
               (writing-habit-db-close db))))
          (_ (error "Usage: track import|add|sync ..."))))

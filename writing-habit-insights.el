@@ -47,6 +47,7 @@
 (require 'seq)
 (require 'subr-x)
 (require 'writing-habit-coach)
+(require 'writing-habit-db)
 (require 'writing-habit-checks)
 (require 'writing-habit-lists)
 (require 'writing-habit-records)
@@ -292,7 +293,10 @@ A task the model dropped is put at the end, left where it was."
                    params))
          (actual (sqlite-select
                   db (concat "SELECT (CAST(strftime('%w', day) AS INTEGER) + 6) % 7, SUM(actual_min)"
-                             " FROM session WHERE 1" clause " GROUP BY 1")
+                             ;; Risky prospecting has no plan to adhere to.
+                             " FROM session WHERE 1"
+                             (if (writing-habit-db-has-prospecting db) " AND prospecting = 0" "")
+                             clause " GROUP BY 1")
                   params))
          (rows '()))
     (dolist (p planned)

@@ -398,7 +398,7 @@ The file option names the mytime.db; when it is unset or not a database,
     (writing-habit-dispatch-run-habit
      (list "track" "sync" source)
      (seq-filter (lambda (a) (string-match-p
-                              "\\`--\\(db\\|since\\|until\\|scope\\|table\\)=\\|\\`--dry-run\\'" a))
+                              "\\`--\\(db\\|since\\|until\\|scope\\|table\\|prospect-range\\)=\\|\\`--dry-run\\'" a))
                  args))))
 
 ;;;###autoload (autoload 'writing-habit-dispatch-track "writing-habit-dispatch" nil t)
@@ -415,6 +415,7 @@ The file option names the mytime.db; when it is unset or not a database,
    ("-b" "Since (first day)" "--since=" :reader writing-habit-dispatch--read-date)
    ("-u" "Until (last day)" "--until=" :reader writing-habit-dispatch--read-date)
    ("-T" "Table for weeks with no plan" "--table=" :reader transient-read-existing-file)
+   ("-R" "Risky prospecting ranges, or none" "--prospect-range=")
    ("-y" "Dry run, write nothing" "--dry-run")]
   ["Session"
    ("-D" "Day" "--day=" :reader writing-habit-dispatch--read-date)

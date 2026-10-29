@@ -66,6 +66,10 @@
   '("day" "week_start" "actual_min" "worked")
   "Column order of v_day_actual.")
 
+(defconst writing-habit-compare--prospecting-columns
+  '("week_start" "code" "description" "sessions" "actual_min" "weeks_so_far")
+  "Column order of v_week_prospecting.")
+
 (defconst writing-habit-compare--overall-columns
   '("week_start" "planned_min" "actual_min" "adherence")
   "Column order of v_week_overall.")
@@ -117,6 +121,19 @@ This matches the week_start generated column in the schema."
    db "SELECT * FROM v_week_barbell WHERE week_start = ? ORDER BY risk_class"
    (list (writing-habit-compare--monday week))
    writing-habit-compare--barbell-columns))
+
+(defun writing-habit-compare-week-prospecting (db week)
+  "Risky prospecting per project in DB for WEEK: work on a project on no list.
+A database made before the prospecting label has no such view, and then
+there is nothing to report."
+  (when (sqlite-select
+         db (concat "SELECT 1 FROM sqlite_master WHERE type = 'view'"
+                    " AND name = 'v_week_prospecting'"))
+    (writing-habit-compare--rows
+     db (concat "SELECT * FROM v_week_prospecting WHERE week_start = ?"
+                " ORDER BY actual_min DESC, code")
+     (list (writing-habit-compare--monday week))
+     writing-habit-compare--prospecting-columns)))
 
 (defun writing-habit-compare-day-actual (db week)
   "Actual minutes and worked flag per day in DB for WEEK."

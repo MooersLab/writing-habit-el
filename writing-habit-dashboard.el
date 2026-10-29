@@ -31,8 +31,9 @@
 ;; planned schedule as a time-by-day grid, colored by activity.  The second
 ;; compares planned against actual effort: per-project meters with adherence,
 ;; the activity balance, and the barbell split, plus the summary tiles and the
-;; streak.  The output is one HTML file with inline CSS and no external
-;; requests.
+;; streak.  A week with risky prospecting, tracked work on a project that
+;; is on no list, also gets a section of its own.  The output is one HTML
+;; file with inline CSS and no external requests.
 ;;
 ;; The markup is built deterministically from the shared database, and the
 ;; static blocks below are the same text the Python module carries, so the two
@@ -400,8 +401,11 @@ Each row is (offset start end code activity)."
                     "</td></tr>")))))
         (append out (list "    </tbody>" "  </table>"))))))
 
-(defun writing-habit-dashboard--barbell (bar)
-  "Return the barbell-split lines for BAR."
+(defun writing-habit-dashboard--barbell (bar &optional prospect-min)
+  "Return the barbell-split lines for BAR.
+PROSPECT-MIN, the week's minutes of risky prospecting, adds a row and a
+line on the risky share when it is above zero."
+  (setq prospect-min (or prospect-min 0))
   (if (null bar)
       '()
     (cl-flet ((sum-for (risk field)
@@ -424,12 +428,90 @@ Each row is (offset start end code activity)."
                     "</td><td class=\"num\">" (writing-habit-dashboard--num r "planned_min")
                     "</td><td class=\"num\">" (writing-habit-dashboard--num r "actual_min")
                     "</td></tr>")))))
+        (when (> prospect-min 0)
+          (setq out (append out (list
+            (concat "      <tr><td>risky prospecting"
+                    "</td><td class=\"num\">0"
+                    "</td><td class=\"num\">" (number-to-string prospect-min)
+                    "</td></tr>")))))
         (append out (list "    </tbody>" "  </table>"
                           (concat "  <p class=\"sub\">Speculative share: planned "
                                   (number-to-string (writing-habit-dashboard--pct spec-plan p-plan))
                                   "%, actual "
                                   (number-to-string (writing-habit-dashboard--pct spec-act p-act))
-                                  "%.</p>")))))))
+                                  "%.</p>"))
+                (when (> prospect-min 0)
+                  (list (concat "  <p class=\"sub\">Counting risky prospecting with the"
+                                " speculative work, the risky share of actual time is "
+                                (number-to-string
+                                 (writing-habit-dashboard--pct (+ spec-act prospect-min)
+                                                               (+ p-act prospect-min)))
+                                "%.</p>"))))))))
+
+
+;;;; Risky prospecting
+
+(defconst writing-habit-dashboard--prospect-style
+  "  <style>
+    .risky { color: var(--actual); font-weight: 650; }
+    tr.stale td { color: var(--actual); }
+  </style>"
+  "The style of the risky-prospecting section, verbatim from the Python twin.
+It is emitted with the section, which appears only when the week has
+prospecting, so a database without it renders the same bytes as before.")
+
+(defconst writing-habit-dashboard-stale-weeks 3
+  "Weeks of prospecting after which a project is drawn in orange.
+A project prospected this long has gone unplanned long enough to call for
+a decision: put it on a list, or let it go.")
+
+(defun writing-habit-dashboard--prospecting (rows planned-actual)
+  "Return the risky-prospecting section for the week's ROWS, or nil.
+PLANNED-ACTUAL is the week's actual minutes on listed projects, so the
+share reads against all the writing the tracker saw."
+  (when rows
+    (let* ((total (apply #'+ (mapcar (lambda (r) (cdr (assoc "actual_min" r))) rows)))
+           (whole (+ planned-actual total))
+           (n (length rows))
+           (out (list writing-habit-dashboard--prospect-style
+                      "  <h2>Risky prospecting</h2>"
+                      (format (concat "  <p class=\"sub\"><span class=\"risky\">%d minutes</span>,"
+                                      " %d%% of the week's tracked writing, went to %d project%s"
+                                      " on no list. Prospecting like this has a high risk of"
+                                      " being abandoned for lack of time, and it is left out of"
+                                      " planned versus actual above.</p>")
+                              total (writing-habit-dashboard--pct total whole) n
+                              (if (= n 1) "" "s"))
+                      "  <table>"
+                      (format (concat "    <caption>Projects in the time tracker but on neither"
+                                      " the week's legend nor the semester lists. A row in"
+                                      " orange has gone unplanned for %d weeks or more."
+                                      "</caption>")
+                              writing-habit-dashboard-stale-weeks)
+                      (concat "    <thead><tr><th>Project</th><th class=\"num\">Sessions</th>"
+                              "<th class=\"num\">Minutes</th><th class=\"num\">Share</th>"
+                              "<th class=\"num\">Weeks so far</th></tr></thead>")
+                      "    <tbody>")))
+      (dolist (r rows)
+        (setq out (append out (list
+          (concat "      <tr"
+                  (if (>= (cdr (assoc "weeks_so_far" r)) writing-habit-dashboard-stale-weeks)
+                      " class=\"stale\"" "")
+                  "><td>"
+                  (writing-habit-dashboard--esc
+                   (let ((d (cdr (assoc "description" r))))
+                     (if (and d (not (equal d ""))) d (cdr (assoc "code" r)))))
+                  "</td><td class=\"num\">" (writing-habit-dashboard--num r "sessions")
+                  "</td><td class=\"num\">" (writing-habit-dashboard--num r "actual_min")
+                  "</td><td class=\"num\">"
+                  (number-to-string (writing-habit-dashboard--pct (cdr (assoc "actual_min" r))
+                                                                  whole))
+                  "%</td><td class=\"num\">" (writing-habit-dashboard--num r "weeks_so_far")
+                  "</td></tr>")))))
+      (append out (list "    </tbody>" "  </table>"
+                        (concat "  <p class=\"sub\">Add a project worth keeping to a semester"
+                                " list and give it a block, so the next sync counts it as"
+                                " planned work. Let the rest go.</p>"))))))
 
 
 ;;;; Work intensity: personal bests and the done list
@@ -551,6 +633,8 @@ done list; it defaults to the real date."
          (proj (writing-habit-compare-week-project db week))
          (cat (writing-habit-compare-week-category db week))
          (bar (writing-habit-compare-week-barbell db week))
+         (prospect (writing-habit-compare-week-prospecting db week))
+         (prospect-min (apply #'+ (mapcar (lambda (r) (cdr (assoc "actual_min" r))) prospect)))
          (streak (writing-habit-compare-current-streak db))
          (planned-total (apply #'+ (mapcar (lambda (r) (cdr (assoc "planned_min" r))) proj)))
          (actual-total (apply #'+ (mapcar (lambda (r) (cdr (assoc "actual_min" r))) proj)))
@@ -578,7 +662,8 @@ done list; it defaults to the real date."
                                (writing-habit-dashboard--schedule-rows db week-start))))
     (setq lines (append lines (writing-habit-dashboard--projects proj)))
     (setq lines (append lines (writing-habit-dashboard--activities cat)))
-    (setq lines (append lines (writing-habit-dashboard--barbell bar)))
+    (setq lines (append lines (writing-habit-dashboard--barbell bar prospect-min)))
+    (setq lines (append lines (writing-habit-dashboard--prospecting prospect actual-total)))
     (setq lines (append lines (writing-habit-dashboard--intensity db week-start today)))
     (setq lines (append lines (list
                                (concat "  <p class=\"foot\">Generated by writing-habit from the"

@@ -385,6 +385,17 @@ the icalendar library bundled with Emacs, so it needs no extra package."
 ;; falls in joins the two.  Each copied row carries the source_ref
 ;; mytime.db:zTimeSpent:<id>, so a rerun updates rows instead of
 ;; duplicating them.
+;;
+;; Risky prospecting.  A session whose project is in neither the week's
+;; legend nor the semester lists is exploratory work on a project that has
+;; not earned a place in the plan, and it has a high risk of being
+;; abandoned for lack of time.  With scope semester or all, a session whose
+;; project number falls in `writing-habit-track-prospect-ranges' is kept
+;; under its directory name and flagged prospecting, which labels it risky.
+;; The comparison views leave it out of planned versus actual, and the
+;; dashboard reports it in a section of its own.  Numbers outside the
+;; ranges, such as commuting (6004) or committee work (7401), stay out as
+;; before.  A later sync clears the flag once the project is on a list.
 
 (defconst writing-habit-track-sync-source-table "zTimeSpent"
   "The table of a mytime.db database that holds timed sessions.")
@@ -393,6 +404,16 @@ the icalendar library bundled with Emacs, so it needs no extra package."
   "Which projects a sync keeps.
 semester keeps the week's legend and the current and completed semester
 lists, legend keeps only the week's legend, and all keeps every project.")
+
+(defcustom writing-habit-track-prospect-ranges "0000-1999,2100-5999"
+  "Project numbers whose work on no list is labeled risky prospecting.
+A comma-separated list of ranges, such as 0000-1999,2100-5999, the
+default shared with the Python package.  The 2000s up to 2099 hold the
+yearly journals, such as 2026words, and the 6000s and above hold
+administration, service, mentoring, meetings, and personal time, so none
+of those is prospecting.  An empty string turns the label off."
+  :type 'string
+  :group 'writing-habit)
 
 (defcustom writing-habit-track-mytime-db "~/6003TimeTracking/cb/mytime.db"
   "The mytime.db time-tracking database that `track sync' reads."
@@ -410,7 +431,29 @@ LEFT-OUT-MINUTES is an alist in first-seen order."
   (rows-read 0) (inserted 0) (updated 0) (unchanged 0)
   (skipped-no-time 0) (skipped-no-project 0) (skipped-not-in-legend 0)
   (skipped-no-legend 0) (semester-unplanned 0)
+  (prospecting 0) (prospecting-minutes nil)
   (weeks-without-plan nil) (weeks-without-legend nil) (left-out-minutes nil))
+
+(defun writing-habit-track-parse-ranges (text)
+  "Return a list of (LOW . HIGH) project-number ranges from TEXT.
+TEXT is such as \"0000-1999,2100-5999\".  A single number names a range
+of one, and an empty TEXT names no range.  Signal an error on a part that
+is not a range."
+  (let ((ranges '()))
+    (dolist (part (split-string (string-replace ";" "," (or text "")) "," t "[ \t]+"))
+      (unless (string-match "\\`\\([0-9]\\{1,4\\}\\)[ \t]*\\(?:-[ \t]*\\([0-9]\\{1,4\\}\\)\\)?\\'"
+                            part)
+        (error "Not a project-number range: %S" part))
+      (let* ((low (string-to-number (match-string 1 part)))
+             (high (if (match-string 2 part) (string-to-number (match-string 2 part)) low)))
+        (push (cons (min low high) (max low high)) ranges)))
+    (nreverse ranges)))
+
+(defun writing-habit-track-in-ranges (number ranges)
+  "Return non-nil when the four-digit project NUMBER falls in one of RANGES."
+  (and number
+       (let ((value (string-to-number number)))
+         (seq-some (lambda (r) (<= (car r) value (cdr r))) ranges))))
 
 (defun writing-habit-track-project-numbers (text)
   "Return the four-digit project numbers at the start of tokens in TEXT.
@@ -558,18 +601,36 @@ the table that supplied the legend."
             (append (writing-habit-sync-left-out-minutes report)
                     (list (cons name minutes)))))))
 
+(defun writing-habit-track--prospected (report name minutes)
+  "Add MINUTES to NAME among the projects REPORT kept as risky prospecting."
+  (let ((cell (assoc name (writing-habit-sync-prospecting-minutes report))))
+    (if cell
+        (setcdr cell (+ (cdr cell) minutes))
+      (setf (writing-habit-sync-prospecting-minutes report)
+            (append (writing-habit-sync-prospecting-minutes report)
+                    (list (cons name minutes)))))))
+
+(defun writing-habit-track--top-minutes (alist)
+  "Return the twelve largest cells of ALIST, by minutes, ties in first-seen order."
+  (seq-take (sort (copy-sequence alist) (lambda (a b) (> (cdr a) (cdr b)))) 12))
+
 (cl-defun writing-habit-track-sync-mytime (db source &key since until (scope "semester")
-                                              table dry-run)
+                                              table dry-run
+                                              (prospect-ranges
+                                               writing-habit-track-prospect-ranges))
   "Copy timed sessions from the mytime.db database SOURCE into DB.
 SINCE and UNTIL bound the days copied; SINCE defaults to the first
 planned week.  SCOPE is semester, legend, or all, as in
 `writing-habit-track-sync-scopes'.  TABLE is a weekly org table whose
 legend serves weeks with no imported plan.  With DRY-RUN, count what
-would change and write nothing.  Return a
-`writing-habit-sync'."
+would change and write nothing.  PROSPECT-RANGES names the project
+numbers whose work on no list is kept and labeled risky prospecting; it
+defaults to `writing-habit-track-prospect-ranges', and an empty string
+turns the label off.  Return a `writing-habit-sync'."
   (unless (member scope writing-habit-track-sync-scopes)
     (error "Scope must be one of %s" (string-join writing-habit-track-sync-scopes ", ")))
-  (let ((src-path (expand-file-name source)))
+  (let ((src-path (expand-file-name source))
+        (ranges (writing-habit-track-parse-ranges prospect-ranges)))
     (unless (file-regular-p src-path)
       (error "No time-tracking database at %s" src-path))
     (let* ((since (or since (writing-habit-track-default-since db)))
@@ -587,6 +648,8 @@ would change and write nothing.  Return a
                      (sqlite-close src))))
            (legends (writing-habit-track--legends db (and table (expand-file-name table))))
            (report (writing-habit-sync-create))
+           (has-flag (progn (unless dry-run (writing-habit-db-migrate db))
+                            (writing-habit-db-has-prospecting db)))
            (ref-prefix (format "%s:%s:" (file-name-nondirectory src-path)
                                writing-habit-track-sync-source-table)))
       (sqlite-transaction db)
@@ -616,11 +679,20 @@ would change and write nothing.  Return a
                       (cl-incf (writing-habit-sync-skipped-no-legend report))
                       (throw 'next nil))
                     (let* ((letter (and number (cdr (assoc number numbers))))
-                           (on-semester (and (null letter) (equal scope "semester") number
-                                             (member number semester))))
+                           (listed (and (null letter) number numbers
+                                        (member number semester) t))
+                           (on-semester (and listed (equal scope "semester")))
+                           (prospect (and (null letter) (not listed)
+                                          (not (equal scope "legend")) numbers
+                                          (writing-habit-track-in-ranges number ranges)
+                                          t)))
                       (cond
                        (on-semester
                         (cl-incf (writing-habit-sync-semester-unplanned report)))
+                       (prospect
+                        (cl-incf (writing-habit-sync-prospecting report))
+                        (writing-habit-track--prospected
+                         report (if (string-empty-p directory) number directory) minutes))
                        ((and (null letter) (not (equal scope "all")))
                         (cl-incf (writing-habit-sync-skipped-not-in-legend report))
                         (writing-habit-track--left-out
@@ -641,10 +713,14 @@ would change and write nothing.  Return a
                              (note (writing-habit-track--nonempty
                                     (and (stringp desc) desc)))
                              (ref (format "%s%s" ref-prefix id))
-                             (values (list day start end minutes pid cat-id note))
+                             (flag (if prospect 1 0))
+                             (values (list day start end minutes pid cat-id note flag))
+                             ;; A dry run on a database made before the flag
+                             ;; cannot read the column, so it compares the rest.
                              (old (car (sqlite-select
                                         db (concat "SELECT session_id, day, start_time, end_time,"
-                                                   " actual_min, project_id, category_id, note"
+                                                   " actual_min, project_id, category_id, note, "
+                                                   (if has-flag "prospecting" "0")
                                                    " FROM session WHERE source = 'sqlite'"
                                                    " AND source_ref = ?")
                                         (list ref)))))
@@ -652,16 +728,21 @@ would change and write nothing.  Return a
                          ((null old)
                           (sqlite-execute
                            db (concat "INSERT INTO session(day, start_time, end_time, actual_min,"
-                                      " project_id, category_id, source, source_ref, note)"
-                                      " VALUES (?, ?, ?, ?, ?, ?, 'sqlite', ?, ?)")
-                           (append (seq-take values 6) (list ref note)))
+                                      " project_id, category_id, source, source_ref, note"
+                                      (if has-flag ", prospecting" "")
+                                      ") VALUES (?, ?, ?, ?, ?, ?, 'sqlite', ?, ?"
+                                      (if has-flag ", ?" "") ")")
+                           (append (seq-take values 6) (list ref note)
+                                   (and has-flag (list flag))))
                           (cl-incf (writing-habit-sync-inserted report)))
                          ((not (equal (cdr old) values))
                           (sqlite-execute
                            db (concat "UPDATE session SET day = ?, start_time = ?, end_time = ?,"
                                       " actual_min = ?, project_id = ?, category_id = ?, note = ?"
+                                      (if has-flag ", prospecting = ?" "")
                                       " WHERE session_id = ?")
-                           (append values (list (car old))))
+                           (append (if has-flag values (butlast values))
+                                   (list (car old))))
                           (cl-incf (writing-habit-sync-updated report)))
                          (t (cl-incf (writing-habit-sync-unchanged report)))))))))))
         (error (sqlite-rollback db) (signal (car err) (cdr err))))
@@ -702,6 +783,13 @@ Python package's report line for line."
                                                       " but not in the week's legend,"
                                                       " as unplanned work")
                                               (writing-habit-sync-semester-unplanned r))))))
+    (when (> (writing-habit-sync-prospecting r) 0)
+      (setq lines (append lines (list (format (concat "  kept %d on no list as risky"
+                                                      " prospecting, with their minutes:")
+                                              (writing-habit-sync-prospecting r)))))
+      (dolist (cell (writing-habit-track--top-minutes
+                     (writing-habit-sync-prospecting-minutes r)))
+        (setq lines (append lines (list (format "    %-36s %6d" (car cell) (cdr cell)))))))
     (when (> (writing-habit-sync-skipped-no-legend r) 0)
       (setq lines
             (append lines

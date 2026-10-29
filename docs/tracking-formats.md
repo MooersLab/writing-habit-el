@@ -112,6 +112,28 @@ tracker and never duplicates one. The sync matches `track sync` of the Python
 package row for row and prints the same report, which ends with the projects
 it left out and their minutes.
 
+### Risky prospecting
+
+A writing project that appears in the tracker but on neither the week's legend
+nor the semester lists (current, carried over, or completed) is kept under its
+directory name and flagged `prospecting`. This is risky work. Prospecting on a
+project that has not earned a place in the plan has a high risk of being
+abandoned for lack of time. The plan comparisons leave it out, and the
+dashboard and the org report show it in a section of its own. The report of the
+sync lists these projects with their minutes.
+
+The project number decides what counts as a writing project.
+`writing-habit-track-prospect-ranges` holds the ranges, `0000-1999,2100-5999` by
+default, the same as the Python package. The 6000s and above (commuting,
+administration, committees, mentoring, meetings, personal time) and the yearly
+journals in 2000-2099 are never prospecting. Set the option to an empty string
+to turn the label off. From a shell, `--prospect-range RANGES` sets the ranges
+for one run, and `--prospect-range none` turns the label off. In the menu, `-R`
+does the same. The legend scope labels nothing, and the all scope still labels
+unlisted writing projects. A rerun clears the flag once the project is added to
+a list. A database made before the label gains the column the first time a sync
+or `writing-habit-db-init` touches it.
+
 ## Marking safe and speculative projects
 
 The barbell view needs to know which projects are safe and which are

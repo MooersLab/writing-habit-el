@@ -61,7 +61,8 @@ TESTS = test/writing-habit-name-tests.el \
         test/writing-habit-hours-tests.el \
         test/writing-habit-insights-tests.el \
         test/writing-habit-pomodoro-tests.el \
-        test/writing-habit-menu-tests.el
+        test/writing-habit-menu-tests.el \
+        test/writing-habit-prospecting-tests.el
 
 LOADPATH = -L . $(if $(WRITING_SCHEDULE_DIR),-L $(WRITING_SCHEDULE_DIR),)
 TESTLOAD = $(foreach t,$(TESTS),-l $(t))
