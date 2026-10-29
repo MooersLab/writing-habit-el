@@ -85,6 +85,33 @@ emacs --batch -l writing-habit -f writing-habit-batch \
 
 ![The HTML dashboard for the week, light theme.](imgs/dashboard-light.png)
 
+## Step 6, spot risky prospecting
+
+If you keep a mytime.db time tracker, `M-x writing-habit-track-sync-mytime-file`
+copies its sessions in place of the CSV. It also catches the work you never
+planned. A session on a writing project that is on neither the week's legend
+nor the semester lists is labeled risky prospecting. The report opens in a
+buffer, with a line such as `kept 2 on no list as risky prospecting` and each
+project with its minutes. From a shell:
+
+```sh
+emacs --batch -l writing-habit -f writing-habit-batch \
+      track sync ~/6003TimeTracking/cb/mytime.db --db habit.db
+```
+
+Run the report and the dashboard again. The prospecting stays out of the
+planned-versus-actual numbers. The org report gains a `Risky prospecting`
+heading, and the dashboard gains a section that lists each unplanned project
+with its sessions, its minutes, its share of the week's tracked writing, and the
+weeks it has gone unplanned so far. A project prospected for three weeks or more
+is drawn in orange. That is the cue to decide. Add the project to the
+current semester list in the week file and give it a block, or let it go.
+
+`writing-habit-track-prospect-ranges` decides which project numbers count as
+writing projects. The default, `0000-1999,2100-5999`, leaves out the yearly
+journals and the numbers from 6000 up, such as commuting. In the menu, `-R` sets
+the ranges for one sync.
+
 ## What each output is for
 
 The org report is the quickest read inside Emacs, and it drops straight into a

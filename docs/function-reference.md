@@ -73,6 +73,8 @@ package.
 | `writing-habit-track-sync-mytime-file` | command | Copy sessions from a mytime.db into a database file and show the report. |
 | `writing-habit-track-sync-mytime` | function | Copy timed sessions from `zTimeSpent`, keyed by `source_ref`, and return a report. |
 | `writing-habit-track-sync-report-string` | function | The sync report as text, the same as the Python one. |
+| `writing-habit-track-parse-ranges` | function | Project-number ranges, such as `0000-1999,2100-5999`, read into pairs. |
+| `writing-habit-track-in-ranges` | function | Whether a four-digit project number falls in the ranges. |
 | `writing-habit-track-legend-numbers`, `-semester-numbers` | function | The project numbers a table's legend and semester lists name. |
 | `writing-habit-track-add` | function | Insert one session into an open database and return its id. |
 | `writing-habit-track-import-csv` | function | Insert one session per data row of the tracking CSV. |
@@ -81,7 +83,7 @@ package.
 
 ## writing-habit-compare
 
-Thin wrappers over the four comparison views plus the streak. It never writes
+Thin wrappers over the comparison views plus the streak. It never writes
 its own aggregation SQL.
 
 | Symbol | What it does |
@@ -89,6 +91,7 @@ its own aggregation SQL.
 | `writing-habit-compare-week-project` | Planned versus actual and adherence per project for a week. |
 | `writing-habit-compare-week-category` | Planned versus actual per activity for a week. |
 | `writing-habit-compare-week-barbell` | Planned versus actual per risk class for a week. |
+| `writing-habit-compare-week-prospecting` | Risky prospecting per unlisted project for a week, or nil for a database made before the label. |
 | `writing-habit-compare-day-actual` | Actual minutes and a worked flag per day for a week. |
 | `writing-habit-compare-current-streak` | Length of the run of consecutive worked days ending at the latest. |
 
@@ -217,6 +220,8 @@ table and returns new lines, so the caller decides when to write.
 |----------|---------|---------|
 | `writing-habit-db-schema-file` | `schema.sql` beside the package | Path to the shared schema. |
 | `writing-habit-track-mytime-db` | `~/6003TimeTracking/cb/mytime.db` | The mytime.db that `track sync` reads. |
+| `writing-habit-track-prospect-ranges` | `"0000-1999,2100-5999"` | Project numbers whose work on no list is labeled risky prospecting. |
+| `writing-habit-dashboard-stale-weeks` | 3 | Weeks of prospecting after which a project is drawn in orange. |
 | `writing-habit-report-python` | `"python3"` | Interpreter for the optional plots. |
 | `writing-habit-default-db` | nil | Database that seeds the forms of the menu. |
 | `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes. |

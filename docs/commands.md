@@ -49,7 +49,7 @@ emacs --batch -l writing-habit -f writing-habit-batch initdb --db DB
 emacs --batch -l writing-habit -f writing-habit-batch plan import TABLE --week DATE --db DB
 emacs --batch -l writing-habit -f writing-habit-batch track import FILE --format csv|ics --db DB
 emacs --batch -l writing-habit -f writing-habit-batch \
-      track sync MYTIME.DB [--since DATE] [--until DATE] [--scope semester|legend|all] [--table TABLE] [--dry-run] --db DB
+      track sync MYTIME.DB [--since DATE] [--until DATE] [--scope semester|legend|all] [--table TABLE] [--prospect-range RANGES|none] [--dry-run] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch \
       track add --day DATE --project CODE [--minutes N] [--category C] [--start HH:MM] [--end HH:MM] [--note TEXT] --db DB
 emacs --batch -l writing-habit -f writing-habit-batch compare --week DATE [--plot FILE] --db DB
@@ -86,6 +86,13 @@ imported plan borrows the legend of `--table`. `--dry-run` reports and writes
 nothing. A rerun updates rows instead of duplicating them. See the tracking
 formats page for details.
 
+Work on a writing project that is on neither the week's legend nor the
+semester lists is kept under its directory name and labeled risky prospecting,
+in the semester and all scopes. `--prospect-range` names the project numbers
+that count as writing projects, `0000-1999,2100-5999` by default from
+`writing-habit-track-prospect-ranges`, and `--prospect-range none` turns the
+label off. The report lists the prospecting projects with their minutes.
+
 `track add` inserts one session. Give `--minutes`, or both `--start` and
 `--end`, and give `--category` when the activity matters.
 
@@ -94,7 +101,8 @@ activity, and by barbell class, and prints the current streak. With `--plot` it
 also writes a bar chart, which needs `python3` with `matplotlib`.
 
 `dashboard` renders the self-contained HTML dashboard for the week and writes it
-to `--out`.
+to `--out`. A week with risky prospecting gains a section that lists each
+unplanned project.
 
 `history` prints one row per week with the overall adherence, which is summed
 actual over summed planned minutes, the mean of the per-project ratios, and that

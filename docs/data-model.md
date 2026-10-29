@@ -52,7 +52,12 @@ stores the day, the actual minutes, the project, and an optional activity. The
 start and end times may be empty, because the paper-then-transcribe path enters
 only a duration. A `source` column records where the session came from, one of
 `ics`, `csv`, `manual`, or `sqlite`, and a `source_ref` records the row, the
-calendar UID, or the org-clock provenance so a re-import can be traced.
+calendar UID, or the org-clock provenance so a re-import can be traced. A
+`prospecting` flag is 1 when the mytime.db sync found the session's project in
+the tracker but on neither the week's legend nor the semester lists. Such a
+session is risky prospecting, and the plan comparisons leave it out.
+`writing-habit-db-init` adds the column to a database made before the flag, with
+every older session marked 0.
 
 The `import_log` table records the provenance of every import, namely what was
 read, how many rows were read and inserted, and when. It exists for
@@ -67,9 +72,9 @@ view because its project is known, and it is left out of the activity view
 because its activity is unknown. Give a session an activity whenever the split
 across the three activities matters to you.
 
-## The four comparison views
+## The five comparison views
 
-The compare stage reads these four views and nothing else, so the schema stays
+The compare stage reads these five views and nothing else, so the schema stays
 the single source of truth for every total.
 
 | View | What it returns | What it feeds |
@@ -78,6 +83,12 @@ the single source of truth for every total.
 | `v_week_category` | planned and actual minutes, per week and activity | the Rule 2 balance across the three activities |
 | `v_week_barbell` | planned and actual minutes, per week and risk class | the Rule 6 drift, whether the speculative slot was starved |
 | `v_day_actual` | actual minutes and a worked flag, per day | the streak of consecutive writing days |
+| `v_week_prospecting` | sessions, actual minutes, and the weeks so far, per week and unlisted project | the risky-prospecting part of the dashboard and the report |
+
+The project, activity, and overall views count only sessions with
+`prospecting = 0`, because work on a project that is on no list has no plan to
+adhere to. `v_day_actual` counts every session, so a day of prospecting still
+keeps the streak alive.
 
 The adherence ratio in `v_week_project` is the actual minutes over the planned
 minutes, rounded to two places, and it is null when nothing was planned. The

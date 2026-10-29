@@ -36,7 +36,7 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 
 - A plan importer that reuses the real `writing-schedule.el` parser, so a weekly table loads into the database exactly as the schedule reads it.
 - Four ways to record actual sessions: by hand, from the tracking CSV, from an ICS calendar, and by harvesting completed org-clock entries. The ICS reader uses the bundled `icalendar.el`, so it needs no third-party package.
-- A comparison layer over four SQL views: planned versus actual per project with adherence, the activity balance from Rule 2, the barbell split from Rule 6, and the current streak of consecutive writing days.
+- A comparison layer over SQL views: planned versus actual per project with adherence, the activity balance from Rule 2, the barbell split from Rule 6, the risky prospecting on writing projects that are on no list, and the current streak of consecutive writing days.
 - A weekly report rendered as an org document, with booktabs tables and captions, so it folds, exports to a clean PDF, and pastes into a log with no conversion.
 - An optional planned-versus-actual bar chart, embedded in the report as an Org Babel python block or written directly to a PNG for batch use.
 - A self-contained HTML dashboard with two panels: the week's planned schedule as a time-by-day grid colored by activity, and the planned-versus-actual comparison as tiles, per-project meters, the activity balance, and the barbell split. Once the record holds them, it adds the personal bests, the share of the plan kept in weeks with the coach and without it, and the done list with the outcome of every planned block. It carries a light and a dark theme, needs no server, and matches the Python dashboard byte for byte.
@@ -212,6 +212,15 @@ The harvest is idempotent, so running it again over the same clocks inserts noth
 
 To bring in sessions from a mytime.db time-tracking database, run `M-x writing-habit-track-sync-mytime-file`, or `track sync` from a shell. The legend of each week maps the tracker's four-digit project numbers to codes, and a rerun updates rows instead of duplicating them. See `docs/tracking-formats.md`.
 
+The sync also labels risky prospecting. A session on a writing project that is in the tracker but on neither the week's legend nor the semester lists is kept under its directory name and flagged. Such exploratory work has a high risk of being abandoned for lack of time. The plan comparisons leave it out, and the dashboard and the org report give it a section of its own, with the weeks each project has gone unplanned. `writing-habit-track-prospect-ranges` sets which project numbers count as writing projects, `0000-1999,2100-5999` by default, and `--prospect-range none` turns the label off for one run:
+
+```sh
+emacs --batch -l writing-habit -f writing-habit-batch \
+      track sync ~/6003TimeTracking/cb/mytime.db --db ~/org/writing-habit.db --prospect-range none
+```
+
+Add a project worth keeping to a semester list and give it a block. The next sync counts it as planned work and clears the label.
+
 ## Marking safe and speculative projects
 
 To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. The two tags are `:safe:` and `:risky:`, and `:risky:` names the class the database calls `speculative`. Support is an activity category, not a risk class, so a support project carries no risk tag.
@@ -244,6 +253,7 @@ Because Emacs runs only the first statement of a multi-statement string through 
 | Variable | Default | Meaning |
 |---|---|---|
 | `writing-habit-db-schema-file` | `schema.sql` beside the package | Path to the shared schema |
+| `writing-habit-track-prospect-ranges` | `"0000-1999,2100-5999"` | Project numbers whose work on no list is labeled risky prospecting; an empty string turns the label off |
 | `writing-habit-report-python` | `"python3"` | Interpreter for the optional plots |
 | `writing-habit-default-db` | nil | Database that seeds the forms of the menu |
 | `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes |
