@@ -61,6 +61,7 @@
 (require 'button)
 (require 'transient)
 (require 'writing-habit-db)
+(require 'writing-habit-menu)
 
 (declare-function writing-habit--dispatch "writing-habit" (args))
 (declare-function writing-habit-track-harvest-clock-file "writing-habit-track" (db-file org-file))

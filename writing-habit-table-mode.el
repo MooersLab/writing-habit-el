@@ -75,6 +75,7 @@
 (require 'writing-habit-plan)
 (require 'writing-habit-table)
 (require 'writing-habit-table-auto)
+(require 'writing-habit-menu)
 
 (defcustom writing-habit-table-mode-prefix "C-c C-;"
   "Key, in `kbd' syntax, that opens the table menu in the mode.

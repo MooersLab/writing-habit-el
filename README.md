@@ -249,6 +249,7 @@ Because Emacs runs only the first statement of a multi-statement string through 
 | `writing-habit-dispatch-auto-preview` | t | Show the main file a command writes |
 | `writing-habit-table-mode-auto` | t | Turn on the table mode in schedule-code files |
 | `writing-habit-table-mode-prefix` | `"C-c C-;"` | Key of the table menu |
+| `writing-habit-menu-text-scale` | 2.0 | Size of the menu text, as a multiple of the default font |
 | `writing-habit-coach-use-model` | nil | Let the checks ask the local model to word their notes |
 | `writing-habit-coach-ai-off` | nil | Mark an AI-off week, in which the coach stays quiet |
 | `writing-habit-checks-energy-file` | `writing-habit-energy.json` in `user-emacs-directory` | The energy profile, in the Python port's JSON form |

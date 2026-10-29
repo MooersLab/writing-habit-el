@@ -48,6 +48,12 @@ idle time.
 `C-c C-;` opens the table menu. Change the key through
 `writing-habit-table-mode-prefix` before the mode first loads.
 
+The menu text is drawn twice the size of the default font. Set
+`writing-habit-menu-text-scale` to another factor, such as 1.5, or to 1 for
+the normal size. The setting applies to every writing-habit menu, and other
+transient menus, such as Magit's, keep their own size. At twice the size the
+six columns of the table menu need a frame about 360 default characters wide.
+
 | Key in the menu | Command | What it does |
 |-----------------|---------|--------------|
 | `a` | `writing-habit-table-insert-above` | insert an empty block above the block or section header at point |
