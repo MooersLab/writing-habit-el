@@ -55,11 +55,13 @@ such as Oct26.org; see `writing-habit-table-week-name-regexp'."
   :group 'writing-habit-table)
 
 (defcustom writing-habit-table-week-name-regexp
-  "\\`\\(?:jan\\|feb\\|mar\\|apr\\|may\\|jun\\|jul\\|aug\\|sep\\|oct\\|nov\\|dec\\)[a-z]*[-_ ]?[0-9]\\{1,2\\}\\'"
+  "\\`\\(?:jan\\|feb\\|mar\\|apr\\|may\\|jun\\|jul\\|aug\\|sep\\|oct\\|nov\\|dec\\)[a-z]*[-_ ]?[0-9]\\{1,2\\}\\(?:[-_].*\\)?\\'"
   "A file name, without its directory and extension, that names a week.
 Weekly tables named for the Monday of their week, such as Oct26.org or
-Nov-2.org, match it, as the Python editor names them.  The match ignores
-case.  Set it to nil to turn the mode on in schedule-code files only."
+Nov-2.org, match it, as the Python editor names them.  A suffix after
+the day that starts with a dash or an underscore, as in Nov2-40h.org,
+is allowed.  The match ignores case.  Set it to nil to turn the mode
+on in schedule-code files only."
   :type '(choice regexp (const :tag "Schedule codes only" nil))
   :group 'writing-habit-table)
 

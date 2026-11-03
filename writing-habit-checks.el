@@ -1343,7 +1343,7 @@ BLOCKS and DAYS count the blocks and their days, and OBJECTIVES holds
                     (file-name-base (writing-habit-table-path table))))
          (months '("jan" "feb" "mar" "apr" "may" "jun" "jul" "aug" "sep" "oct" "nov" "dec"))
          (today (writing-habit-checks--abs (writing-habit-checks--today))))
-    (or (when (and stem (string-match "\\`\\([A-Za-z]+\\)[-_ ]?\\([0-9]\\{1,2\\}\\)\\'" stem))
+    (or (when (and stem (string-match "\\`\\([A-Za-z]+\\)[-_ ]?\\([0-9]\\{1,2\\}\\)\\(?:[-_].*\\)?\\'" stem))
           (let ((month (cl-position (downcase (substring (match-string 1 stem) 0 (min 3 (length (match-string 1 stem)))))
                                     months :test #'equal))
                 (day (string-to-number (match-string 2 stem)))

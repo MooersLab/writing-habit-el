@@ -92,6 +92,10 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
   (should (writing-habit-table-schedule-file-p "/x/Oct26.org"))
   (should (writing-habit-table-schedule-file-p "/x/nov-2.org"))
   (should (writing-habit-table-schedule-file-p "/x/December7.org"))
+  ;; A suffix after the day, such as the hours of the week, is allowed.
+  (should (writing-habit-table-schedule-file-p "/x/Nov2-40h.org"))
+  (should (writing-habit-table-schedule-file-p "/x/Nov-2_draft.org"))
+  (should-not (writing-habit-table-schedule-file-p "/x/Nov2x.org"))
   (should-not (writing-habit-table-schedule-file-p "/x/Oct26.txt"))
   (should-not (writing-habit-table-schedule-file-p "/x/October.org"))
   (should-not (writing-habit-table-schedule-file-p "/x/notes26.org"))
