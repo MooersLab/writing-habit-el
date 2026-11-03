@@ -8,7 +8,7 @@
 
 Track and compare planned versus actual academic writing effort, without leaving Emacs.
 
-`writing-habit` is the Emacs Lisp companion to [writing-schedule.el](https://github.com/MooersLab/writing-schedule) and a port of the Python [writing-habit](https://github.com/MooersLab/writing-habit) package. `writing-schedule` builds a weekly plan; `writing-habit` records what you actually did and shows you the gaps. It records self-reported effort, not verified focus. The accuracy of the data is left to the user.
+`writing-habit` is the Emacs Lisp companion to [writing-schedule.el](https://github.com/MooersLab/writing-schedule) and a port of the Python [writing-habit](https://github.com/MooersLab/writing-habit) package. `writing-schedule` builds a weekly plan; `writing-habit` records what you actually did and shows you the gaps. It records self-reported effort, not verified focus. The user is responsible for the data's accuracy.
 
 The three stages share one SQLite database defined in `schema.sql`, the single contract between them:
 
@@ -16,7 +16,7 @@ The three stages share one SQLite database defined in `schema.sql`, the single c
 - **track** records the effort you actually spent, from a CSV, an ICS calendar, by hand, or harvested from your own org-clock entries.
 - **compare** reports the gap between plan and performance, as an org buffer, an optional plot, or a self-contained HTML dashboard.
 
-Because the schema is the contract, the database this package writes is byte-for-byte the same one the Python package writes, so either tool can read what the other recorded.
+Because the schema is the contract, this package writes the same database the Python package does, so either tool can read what the other recorded.
 
 ## Screenshots
 
@@ -37,15 +37,15 @@ Two reasons. First, most of the intended audience already drafts inside Emacs wi
 - A plan importer that reuses the real `writing-schedule.el` parser, so a weekly table loads into the database exactly as the schedule reads it.
 - Four ways to record actual sessions: by hand, from the tracking CSV, from an ICS calendar, and by harvesting completed org-clock entries. The ICS reader uses the bundled `icalendar.el`, so it needs no third-party package.
 - A comparison layer over SQL views: planned versus actual per project with adherence, the activity balance from Rule 2, the barbell split from Rule 6, the risky prospecting on writing projects that are on no list, and the current streak of consecutive writing days.
-- A weekly report rendered as an org document, with booktabs tables and captions, so it folds, exports to a clean PDF, and pastes into a log with no conversion.
-- An optional planned-versus-actual bar chart, embedded in the report as an Org Babel python block or written directly to a PNG for batch use.
-- A self-contained HTML dashboard with two panels: the week's planned schedule as a time-by-day grid colored by activity, and the planned-versus-actual comparison as tiles, per-project meters, the activity balance, and the barbell split. Once the record holds them, it adds the personal bests, the share of the plan kept in weeks with the coach and without it, and the done list with the outcome of every planned block. It carries a light and a dark theme, needs no server, and matches the Python dashboard byte for byte.
+- A weekly report rendered as an Org document, with booktabs tables and captions, so it folds, exports to a clean PDF, and pastes into a log with no conversion.
+- An optional planned-versus-actual bar chart, embedded in the report as an Org Babel Python block or written directly to a PNG for batch use.
+- A self-contained HTML dashboard with two panels: the week's planned schedule as a time-by-day grid colored by activity, and the planned-versus-actual comparison as tiles, per-project meters, the activity balance, and the barbell split. Once the record holds them, it adds the personal bests, the share of the plan kept in weeks with the coach and without it, and the done list with the outcome of every planned block. It has light and dark themes, needs no server, and matches the Python dashboard byte for byte.
 - A schedule-code decoder that reads a compact file name such as `4gAAeAsA-gWW.org` and checks its project letters against a table legend.
 - A cross-week history of adherence, as a text table identical to the Python output, as an org table, and as a five-panel plot.
 - A minor mode for editing the weekly table, with clash and free-time tints, code completion, and commands that insert and move blocks and projects while keeping the file intact.
-- The coach's planning checks and helpers from the Python port, with the same rules and the same plain notes. They check deadline coverage, match blocks to an energy profile, rescue missed blocks or let them go, capture a stray thought to the grasscatcher, suggest a number for a new project, triage the projects carried into a new semester, find stuck projects, ask why each missed block was missed, and draft the Monday and Friday messages for a partner and a semester review for an annual report. Plan next week from progress shares the week's hours among the checked projects of the progress table by their weights, never more than a project has left, and places the blocks in the hours the energy profile rates best for new writing; unchecking a project and updating shares the hours again, and the boxes carry over to next week. Rank orders the grasscatcher by the nearest deadline and the minutes planned, Size this week's plan suggests the median of the minutes you actually wrote in recent comparable weeks, Read my weeks names the two groups of weeks whose share kept differs most from your overall share and proposes one change, and a comparison reports the share kept in weeks with the coach and without it. The software computes every proposal. A local model, when `writing-habit-coach-use-model` allows it, only words the note, and a note that holds a number the facts do not is replaced by the plain one.
-- Two dashboards of the open week, the twins of two views of the Python window. The hour view lays the blocks out as one row per hour and one column per day, each project in its own colour, so free hours and breaks show at a glance, and RET on a block jumps to its cell. The progress dashboard reads the `progress` table at the end of the week file and draws one bar per unfinished project: the whole bar is the estimate, the filled part the hours spent, the light part the hours left, and the days to the deadline follow the bar. It fills the hours spent from the `zTimeSpent` table of mytime.db, only reading the tracker, and a checked project whose weight is above 0.85 is highlighted. Both ports read and write the same table.
-- A Pomodoro timer in the mode line, the twin of the Python one. It splits the block under way, or the block at point, into Pomodoros with short breaks and a long break at the end of the cycle, fitting as many as the block holds, ticks and buzzes if you like, and counts the Pomodoros finished each day. At 11:59 PM it writes the day's total to `zzPomCount` in mytime.db, one row per day, and writes a day it missed the next time it runs. It writes only to a table of its own shape and never to `zTimeSpent`. `C-c C-; j` starts or pauses it, `C-c C-; J` stops it, and `writing-habit-pomodoro-mode` adds the hotkeys `C-s-p` and `C-s-s`, Control Command P and S on a Mac.
+- The coach's planning checks and helpers from the Python port, with the same rules and the same plain notes. They check deadline coverage, match blocks to an energy profile, rescue missed blocks or let them go, capture a stray thought to the grasscatcher, suggest a number for a new project, triage the projects carried into a new semester, find stuck projects, ask why each missed block was missed, and draft the Monday and Friday messages for a partner and a semester review for an annual report. Plan next week from progress shares the week's hours among the checked projects of the progress table by their weights, never more than a project has left, and places the blocks in the hours the energy profile rates best for new writing; unchecking a project and updating shares the hours again, and the boxes carry over to next week. Rank orders the grasscatcher by the nearest deadline and the minutes planned. Size this week's plan suggests the median of the minutes you actually wrote in recent comparable weeks; Read my weeks names the two groups of weeks whose share kept differs most from your overall share and proposes one change; and a comparison reports the share kept in weeks with the coach and without it. The software computes every proposal. A local model, when `writing-habit-coach-use-model` allows it, only rewrites the note, and a note that contains a number that the facts do not include is replaced with the plain one.
+- Two dashboards of the open week, the twins of two views of the Python window. The hour view lays the blocks out as one row per hour and one column per day, each project in its own color, so free hours and breaks show at a glance, and RET on a block jumps to its cell. The progress dashboard reads the `progress` table at the end of the week file and draws one bar per unfinished project: the whole bar is the estimate, the filled part the hours spent, the light part the hours left, and the days to the deadline follow the bar. It fills the hours spent from the `zTimeSpent` table in mytime.db, reads only the tracker, and highlights a checked project whose weight is above 0.85. Both ports read and write the same table.
+- A Pomodoro timer in the mode line, the twin of the Python one. It splits the block under way, or the block at point, into Pomodoros with short breaks and a long break at the end of the cycle, fitting as many as the block holds, ticks and buzzes if you like, and counts the Pomodoros finished each day. At 11:59 PM, it writes the day's total to `zzPomCount` in mytime.db (one row per day) and marks the day as missed the next time it runs. It writes only to a table of its own shape and never to `zTimeSpent`. `C-c C-; j` starts or pauses it, `C-c C-; J` stops it, and `writing-habit-pomodoro-mode` adds the hotkeys `C-s-p` and `C-s-s`, Control-Command-P and S on a Mac.
 - Every stage is an interactive command, gathered under one menu that also runs the `writing-schedule.el` commands, and every stage is also a batch subcommand, so the toolkit runs from a shell or a Makefile the same way the Python command-line interface does.
 
 ## Requirements
@@ -115,7 +115,20 @@ writing-habit   database: ~/habit.db
 
 ## Editing the weekly table
 
-An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. A lowercase letter before a code, as in `eA`, sets the activity of that block, and a legend tag such as `E: email @support` sets a project's default; each filled cell is tinted by its activity. Clash cells turn red, and with point in the Time column of a block, every block whose range does not overlap it turns yellow. Completion in a day cell offers the legend codes, and the echo area names the project, due date, and risk of the code at point. `M-<up>` and `M-<down>` move a block or a legend entry, and `C-c C-;` opens a menu that inserts blocks with a suggested time range, deletes a block or a legend entry, moves the section activities into the cells, inserts projects with the next free code (a single letter, then a digit `0` to `9`, then `AA`, `AB`, and so on, so the legend can hold 712 projects) and asks for each project's name and `YYYY-MM-DD` deadline, sorts the legend by project number, splits old descriptions into a project and a deadline, copies a project from the semester lists that follow the weekly table into this week's legend, marks a current-semester project completed, renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. Its Coach column runs the planning checks and helpers on the open week, and its Views column opens the hour view (`h`) and the progress dashboard (`g`), updates the hours spent (`U`), and adds the current list's projects to the progress table (`A`). Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
+An org file whose name is a schedule code, such as `4gAeA-gW.org`, opens in `writing-habit-table-mode`. 
+A lowercase letter before a code, as in `eA`, sets that block's activity, and a legend tag such as `E: email @support` sets a project's default. 
+Each filled cell is tinted by its activity. 
+
+Clash cells turn red, and when the  point (i.e., the cursor) is in a block's Time column, every block whose range doesn't overlap it turns yellow. 
+A completed day cell shows the legend codes, and the echo area names the project, due date, and risk of the code at the point. 
+
+`M-<up>` and `M-<down>` move a block or a legend entry.
+`C-c C-;` opens a menu that inserts blocks with a suggested time range, deletes a block or a legend entry, moves the section activities into the cells, inserts projects with the next free code (a single letter, then a digit `0` to `9`, then `AA`, `AB`, and so on, so the legend can hold 712 projects).
+The package asks for each project's name and `YYYY-MM-DD` deadline, sorts the legend by project number, splits old descriptions into a project and a deadline, copies a project from the semester lists that follow the weekly table into this week's legend, marks a current-semester project completed, renames the file to its canonical code, and reports the name, clashes, totals, and legend of the week. 
+
+The menu's Coach column runs the planning checks and helpers on the open week/
+The menu's Views column opens the hour view (`h`) and the progress dashboard (`g`), updates the hours spent (`U`), and adds the current list's projects to the progress table (`A`). 
+Each edit rewrites one line of the file, and each move swaps lines, so the scheduler reads the file as the editor shows it. See `docs/table-mode.md`.
 
 ## Command reference
 
@@ -195,9 +208,9 @@ emacs --batch -l writing-habit -f writing-habit-batch name 4gAAeAsA-gWW --table 
 
 ## Recording actual sessions
 
-The CSV template has the columns `date, start, end, minutes, project_code, category, note`. Enter either a start and an end time or a minutes value. Excel and Google Sheets both export CSV, so no extra dependency is needed.
+The CSV template has the columns `date, start, end, minutes, project_code, category, note`. Enter either a start and an end time or a minutes value. Excel and Google Sheets both export CSV, so you do not need any extra dependencies.
 
-For calendar tracking, keep actuals in their own ICS calendar. Put the legend code in the event summary in brackets, for example `[A] DNPH1 docking`, and put the activity in the categories field. Local floating times import as written, with no timezone shift.
+For calendar tracking, keep actuals in their own ICS calendar. Put the legend code in the event summary in brackets, for example `[A] DNPH1 docking`, and the activity in the categories field. Local floating times import as written, with no timezone shift.
 
 For org-clock harvesting, tag the heading with a project code in brackets and an activity, for example:
 
@@ -210,43 +223,50 @@ CLOCK: [2026-01-19 Mon 04:00]--[2026-01-19 Mon 05:30] =>  1:30
 
 The harvest is idempotent, so running it again over the same clocks inserts nothing new.
 
-To bring in sessions from a mytime.db time-tracking database, run `M-x writing-habit-track-sync-mytime-file`, or `track sync` from a shell. The legend of each week maps the tracker's four-digit project numbers to codes, and a rerun updates rows instead of duplicating them. See `docs/tracking-formats.md`.
+To bring in sessions from a mytime.db time-tracking database, run `M-x writing-habit-track-sync-mytime-file`, or `track sync` from a shell. Each week's legend maps the tracker's four-digit project numbers to codes, and a rerun updates rows instead of duplicating them. See `docs/tracking-formats.md`.
 
-The sync also labels risky prospecting. A session on a writing project that is in the tracker but on neither the week's legend nor the semester lists is kept under its directory name and flagged. Such exploratory work has a high risk of being abandoned for lack of time. The plan comparisons leave it out, and the dashboard and the org report give it a section of its own, with the weeks each project has gone unplanned. `writing-habit-track-prospect-ranges` sets which project numbers count as writing projects, `0000-1999,2100-5999` by default, and `--prospect-range none` turns the label off for one run:
+The sync also labels risky prospecting. A session on a writing project in the tracker but on neither the week's legend nor the semester lists stays under its directory name and is flagged. Such exploratory work has a high risk of being abandoned for lack of time. The plan comparisons leave it out, and the dashboard and the org report give it a section of its own, with the weeks each project has gone unplanned. `writing-habit-track-prospect-ranges` sets which project numbers count as writing projects, `0000-1999,2100-5999` by default, and `--prospect-range none` turns the label off for one run:
 
 ```sh
 emacs --batch -l writing-habit -f writing-habit-batch \
       track sync ~/6003TimeTracking/cb/mytime.db --db ~/org/writing-habit.db --prospect-range none
 ```
 
-Add a project worth keeping to a semester list and give it a block. The next sync counts it as planned work and clears the label.
+Add a project worth keeping to a semester list and block time for it. The next sync counts it as planned work and clears the label.
 
 ## Marking safe and speculative projects
 
-To drive the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. The two tags are `:safe:` and `:risky:`, and `:risky:` names the class the database calls `speculative`. Support is an activity category, not a risk class, so a support project carries no risk tag.
+To drive t (e.g. the barbell view, add a risk tag to the end of a legend description in the weekly table, in either the org-tag form `:safe:` or the parenthesis form `(safe)`. 
+The two tags are `:safe:` and `:risky:`, and `:risky:` names the class the database calls `speculative`. 
+Support is an activity category, not a risk class, so a support time block carries no risk tag.
 
 ```org
 | A: DNPH1 docking :safe:      |  |  |  |  |  |
 | W: 2026words :risky:   |  |  |  |  |  |
 ```
 
-Inside a table cell `:safe:` is literal text, because org reads `:tag:` syntax only on headlines, so it does not affect the table or its export. The plan importer strips the tag before storing the description.
+Inside a table cell, `:safe:` is literal text, because org reads `:tag:` syntax only on headlines, so it does not affect the table or its export. The plan importer strips the tag before storing the description.
 
 ## Schedule-code file names
 
-A weekly table can be named by a compact code that encodes the whole week, for example `4gAAeAsA-gWW.org`. Lowercase letters are activities (`g` generative, `e` editing, `s` support), uppercase letters and single digits are projects (one character is one block), and a digit before the first activity letter of a group is the count of consecutive days. A hyphen separates day groups, and `o` is an open day. The full specification is in `docs/table-file-naming-rules.org`.
+You can name a weekly table with a compact code that encodes the whole week, for example `4gAAeAsA-gWW.org`. 
+Lowercase letters are activities (`g` generative, `e` editing, `s` support), uppercase letters and single digits are projects (one character is one block), and a digit before the first activity letter of a group is the count of consecutive days. A hyphen separates day groups, and `o` is an open day. 
+The full specification is in `docs/table-file-naming-rules.org`.
 
 ```
 M-x writing-habit-name RET 4gAAeAsA-gWW RET
 ```
 
-With a prefix argument the command also prompts for a table file and checks the code's project letters against that table's legend. This command needs no database and no third-party package.
+With a prefix argument, the command also prompts for a table file and checks the code's project letters against that table's legend. This command needs no database and no third-party package.
 
 ## Data model and interoperability
 
-Everything the three stages share lives in `schema.sql`: reference tables for the activities and projects, fact tables for planned blocks and actual sessions, generated columns for the block duration and the week's Monday, and four comparison views. The database is portable, so a session written here reads identically through the Python package, and the reverse holds too, because neither port owns the schema. When the schema changes, it changes in `schema.sql`, and both ports pick it up.
+Everything the three stages share lives in `schema.sql`: reference tables for the activities and projects, fact tables for planned blocks and actual sessions, generated columns for the block duration and the week's Monday, and four comparison views. 
+The database is portable, so a session written here reads identically through the Python package, and vice versa, because neither port owns the schema. 
+When the schema changes, it changes in `schema.sql`, and both ports pick it up.
 
-Because Emacs runs only the first statement of a multi-statement string through `sqlite-execute`, `writing-habit-db-init` splits the schema into statements before running them. The schema's string literals contain no semicolons, so the split is safe.
+Because Emacs runs only the first statement of a multi-statement string through `sqlite-execute`, `writing-habit-db-init` splits the schema into statements before running them. 
+The schema's string literals contain no semicolons, so the split is safe.
 
 ## Configuration
 
@@ -302,7 +322,7 @@ The plan-import tests need `writing-schedule.el`. Point `WRITING_SCHEDULE_DIR` a
 make test WRITING_SCHEDULE_DIR=/path/to/writing-schedule
 ```
 
-A committed fixture, a database built by the Python port, is read back through this package in one test, so the two ports stay in step. The history text is compared with the Python output byte for byte, and `test/parity/run.sh` compares the table model with the Python one over every shipped table.
+One test reads a committed fixture, a database built by the Python port, back through this package so the two ports stay in step. The history text is compared byte for byte with the Python output, and `test/parity/run.sh` compares the table model with the Python one for every shipped table.
 
 ```sh
 make parity WRITING_SCHEDULE_DIR=../writing-schedule PY_DIR=../writing-habit WSPY_DIR=../writing-schedule-py
@@ -317,7 +337,8 @@ make lint
 
 ## Contributing
 
-Bug reports, feature ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, the test commands, the coding conventions, and the interoperability contract with the Python package. Continuous integration runs `make compile` and `make test` across several Emacs versions on every pull request.
+We welcome bug reports, feature ideas, and pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, the test commands, the coding conventions, and the interoperability contract with the Python package. 
+Continuous integration runs `make compile` and `make test` across several Emacs versions on every pull request.
 
 ## Status
 
