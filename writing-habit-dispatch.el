@@ -65,6 +65,7 @@
 
 (declare-function writing-habit--dispatch "writing-habit" (args))
 (declare-function writing-habit-track-harvest-clock-file "writing-habit-track" (db-file org-file))
+(declare-function writing-habit-dashboard-sync "writing-habit-dashboard" (db))
 (declare-function writing-schedule-batch-insert-template "writing-schedule" (n &optional file))
 (declare-function writing-schedule-batch-check "writing-schedule" (table))
 (declare-function writing-schedule-batch-generate "writing-schedule" (table week &optional out-dir))
