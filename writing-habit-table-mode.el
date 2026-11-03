@@ -875,6 +875,11 @@ the wrong plan shape."
 (dolist (command '(writing-habit-insights-rank writing-habit-insights-size-week
                    writing-habit-insights-read-weeks writing-habit-insights-compare-coach))
   (autoload command "writing-habit-insights" nil t))
+(dolist (command '(writing-habit-horizons-weeks-menu writing-habit-horizons-semesters-menu
+                   writing-habit-horizons-goto))
+  (autoload command "writing-habit-horizons" nil t))
+(dolist (command '(writing-habit-objectives-show writing-habit-objectives-suggest))
+  (autoload command "writing-habit-objectives" nil t))
 
 ;;;###autoload (autoload 'writing-habit-table-menu "writing-habit-table-mode" nil t)
 (transient-define-prefix writing-habit-table-menu ()
@@ -897,7 +902,12 @@ the wrong plan shape."
    ["Semester lists"
     ("l" "Copy to this week's legend" writing-habit-table-copy-to-legend)
     ("C" "Mark completed" writing-habit-table-mark-completed)
-    ("S" "Sort list by number" writing-habit-table-sort-by-number)]
+    ("S" "Sort list by number" writing-habit-table-sort-by-number)
+    ("L" "Weeks ahead lists..." writing-habit-horizons-weeks-menu)
+    ("F" "Future semester lists..." writing-habit-horizons-semesters-menu)]
+   ["Block objectives"
+    ("B" "List the objectives of this block" writing-habit-objectives-show)
+    ("G" "Suggest objectives with AI" writing-habit-objectives-suggest)]
    ["Coach"
     ("v" "Check deadline coverage" writing-habit-checks-coverage)
     ("e" "Match blocks to my energy" writing-habit-checks-energy)

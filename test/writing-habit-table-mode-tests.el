@@ -346,6 +346,14 @@ SPEC is (NAME CONTENT), where CONTENT is a string or a fixture file name."
     (should (string-match-p "writing-habit-table-delete-row" suffixes))
     (should (string-match-p "writing-habit-table-delete-project" suffixes))))
 
+(ert-deftest writing-habit-table-mode/lists-ahead-and-objectives-in-the-menu ()
+  "The table menu offers the week and semester lists and the block objectives."
+  (skip-unless writing-habit-table-mode-tests--ok)
+  (let ((suffixes (format "%S" (get 'writing-habit-table-menu 'transient--layout))))
+    (dolist (command '("writing-habit-horizons-weeks-menu" "writing-habit-horizons-semesters-menu"
+                       "writing-habit-objectives-show" "writing-habit-objectives-suggest"))
+      (should (string-match-p command suffixes)))))
+
 (ert-deftest writing-habit-table-mode/insert-project-offers-aa ()
   "With A to Z and 0 to 9 taken the code prompt offers AA."
   (writing-habit-table-mode-tests--with

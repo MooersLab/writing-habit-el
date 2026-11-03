@@ -70,6 +70,10 @@ six columns of the table menu need a frame about 360 default characters wide.
 | `l` | `writing-habit-table-copy-to-legend` | copy the semester-list project at point into this week's legend |
 | `C` | `writing-habit-table-mark-completed` | move the current-semester project at point to the completed list |
 | `S` | `writing-habit-table-sort-by-number` | the same command, listed under "Semester lists" |
+| `L` | `writing-habit-horizons-weeks-menu` | choose a list of the weeks ahead, or the grasscatcher, and go to it |
+| `F` | `writing-habit-horizons-semesters-menu` | choose a list of this semester or of the semesters ahead, and go to it |
+| `B` | `writing-habit-objectives-show` | list the objectives of the block at point and check them off |
+| `G` | `writing-habit-objectives-suggest` | have the local model draft one to three objectives for the block at point |
 | `r` | `writing-habit-table-report` | show the name, clashes, totals, and legend in a side window |
 | `c` | `writing-habit-table-rename-file` | rename the file to the canonical code of its grid |
 | `n` | `writing-schedule-new-week-from-template` | start this week from a template |
@@ -282,6 +286,50 @@ in columns, with its caption kept. writing-schedule 0.6.0 or newer reads
 the `This week` table when it builds the calendar, and a Default activity
 there counts as the `@` tag of the legend.
 
+## Going to the lists of the weeks and semesters ahead
+
+The Schedule tab of the Python editor picks its lists with two rows of
+buttons, one for the weeks and one for the semesters. `L` and `F` in the
+"Semester lists" column open the same two rows as small menus. Each entry
+shows how many rows its list holds, or says that the file does not hold it yet.
+
+```
+Weeks ahead (L)                                 Semesters (F)
+  1 Next week          5 Five weeks out           c Current semester projects
+  2 Two weeks out      6 Six weeks out            o Carried over
+  3 Three weeks out    7 Seven weeks out          d Completed this semester
+  4 Four weeks out     8 Eight weeks out          1 to 6 the semesters ahead
+  g Grasscatcher
+```
+
+A key moves point to the first row of its list. A list that the file lacks
+can be added as an empty `#+NAME:` line at the end of the file, where the
+scheduler never reads it. The lists are found by their `#+NAME:` line, so the
+layout in columns works too, and so does a list named by its title, such as
+`#+NAME: Next week`. `M-x writing-habit-horizons-goto` asks for any list by
+its title.
+
+## The objectives of a block
+
+`B` runs `writing-habit-objectives-show`, the Emacs twin of the Objectives part
+of the Python review panel. Put point on a project code in a time block, or on
+a block in the hour view, and the command lists the block's objectives from the
+`block_objective` table of the habit database. In that buffer, `a` adds an
+objective, `x` or `RET` checks one off or back on, `s` asks the coach, `g`
+reads the database again, and `q` quits. A check is written at once. More
+than three objectives bring the reminder that three or fewer keep the block
+winnable.
+
+`G` runs `writing-habit-objectives-suggest`, the twin of the Suggest button. It
+asks for the task, such as work on the R01, and offers the stuck task first
+when the project keeps missing the same objective. The local model sees only
+what the Python port sends: the task, the project name and deadline, the block
+length, the grasscatcher tasks waiting for the project, the last next-step
+note, and the stuck sentence. Each proposed objective is offered in turn, and
+the accepted ones are saved with the origin `ai`. An accepted if-then plan is
+shown with the objectives and copied to the kill ring for the review note. The
+call is logged in `ai_log`. In an AI-off week the command refuses.
+
 ## The hour view and the progress dashboard
 
 The Views column of the `C-c C-;` menu opens two dashboards of the open week.
@@ -291,7 +339,8 @@ one column per day. A block is named in the hour it starts, with its activity
 letter, code, and times, such as `gA 05:00-06:30`, and shows only `↓` in the
 further hours it fills, so the grid stays quiet; the colour says whose block it is. Each project keeps one colour, a free hour shows a dot,
 and the last row gives each day's planned minutes. `RET` on a block jumps to its
-cell in the table, and `g` redraws.
+cell in the table, `o` lists the block's objectives, `G` asks the coach
+for objectives, and `g` redraws.
 
 `g` runs `writing-habit-progress`, which reads the table named `progress` at
 the end of the week file:

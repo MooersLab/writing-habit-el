@@ -38,6 +38,8 @@ MODULES = writing-habit-db.el \
           writing-habit-hours.el \
           writing-habit-insights.el \
           writing-habit-pomodoro.el \
+          writing-habit-horizons.el \
+          writing-habit-objectives.el \
           writing-habit.el
 
 TESTS = test/writing-habit-name-tests.el \
@@ -62,7 +64,9 @@ TESTS = test/writing-habit-name-tests.el \
         test/writing-habit-insights-tests.el \
         test/writing-habit-pomodoro-tests.el \
         test/writing-habit-menu-tests.el \
-        test/writing-habit-prospecting-tests.el
+        test/writing-habit-prospecting-tests.el \
+        test/writing-habit-horizons-tests.el \
+        test/writing-habit-objectives-tests.el
 
 LOADPATH = -L . $(if $(WRITING_SCHEDULE_DIR),-L $(WRITING_SCHEDULE_DIR),)
 TESTLOAD = $(foreach t,$(TESTS),-l $(t))

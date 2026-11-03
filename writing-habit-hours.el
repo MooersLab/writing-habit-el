@@ -169,7 +169,7 @@ It is the code and times when STARTS is non-nil, else an arrow."
                                 'face (list :background (writing-habit-hours--color (car entry) codes)
                                             :foreground "black"))
                     " " (or (nth 1 entry) "") "\n"))))
-      (insert "\n" (propertize "RET jump to the block   g refresh   q quit\n" 'face 'shadow))
+      (insert "\n" (propertize "RET jump to the block   o objectives   G suggest objectives   g refresh   q quit\n" 'face 'shadow))
       (buffer-string))))
 
 (defvar-local writing-habit-hours--week-buffer nil
@@ -206,10 +206,15 @@ It is the code and times when STARTS is non-nil, else an arrow."
                                (writing-habit-table-block-row block)
                                (writing-habit-table-block-column block))))
 
+(autoload 'writing-habit-objectives-show "writing-habit-objectives" nil t)
+(autoload 'writing-habit-objectives-suggest "writing-habit-objectives" nil t)
+
 (defvar writing-habit-hours-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "RET") #'writing-habit-hours-visit)
     (define-key map (kbd "g") #'writing-habit-hours-refresh)
+    (define-key map (kbd "o") #'writing-habit-objectives-show)
+    (define-key map (kbd "G") #'writing-habit-objectives-suggest)
     (define-key map (kbd "q") #'quit-window)
     map)
   "Keymap of `writing-habit-hours-mode'.")
